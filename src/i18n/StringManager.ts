@@ -97,6 +97,14 @@ export class StringManager {
     return stringProperties.molecules;
   }
 
+  public getStereoStrings() {
+    return stringProperties.stereo;
+  }
+
+  public getStereoA11yStrings() {
+    return stringProperties.a11y.stereo;
+  }
+
   /** Accessibility strings for the Chirality screen. */
   public getChiralityA11yStrings() {
     return stringProperties.a11y.chirality;

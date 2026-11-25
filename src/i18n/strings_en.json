@@ -54,20 +54,28 @@
       "currentDetails": "The simulation is in its initial state."
     },
     "conformations": {
+      "currentDetails": "{{molecule}} at {{angle}}. {{energy}}.",
+      "angleDescription": "{{value}} degrees, {{name}}",
+      "angleName": "Dihedral angle",
+      "temperatureDescription": "{{value}} kelvin",
       "screenSummary": {
-        "playArea": "The play area shows the main simulation content.",
-        "controlArea": "The control area has a Reset All button that returns the simulation to its starting state.",
-        "interactionHint": "Explore the simulation by interacting with its controls."
-      },
-      "currentDetails": "The simulation is in its initial state."
+        "playArea": "The 3D molecule, Newman projection, and curve show the same dihedral angle.",
+        "controlArea": "Choose a molecule, change the angle, animate rotation, or adjust the temperature.",
+        "interactionHint": "Start by changing the dihedral angle and follow the energy."
+      }
     },
     "cyclohexane": {
+      "currentDetails": "{{preset}}. {{populations}}. {{relative}}.",
+      "flipped": "Ring flipped.",
+      "nowAxial": "Carbon {{index}}, {{group}} is now axial.",
+      "nowEquatorial": "Carbon {{index}}, {{group}} is now equatorial.",
+      "progressDescription": "{{value}} percent through the flip path",
+      "viewerHelp": "Select a ring carbon to edit its substituents. Use N or P to move between carbons and Enter or Space to select.",
       "screenSummary": {
-        "playArea": "The play area shows the main simulation content.",
-        "controlArea": "The control area has a Reset All button that returns the simulation to its starting state.",
-        "interactionHint": "Explore the simulation by interacting with its controls."
-      },
-      "currentDetails": "The simulation is in its initial state."
+        "playArea": "A rotatable cyclohexane structure and an energy curve show the course of a ring flip.",
+        "controlArea": "Choose a preset, flip the ring, or edit the groups attached to a ring carbon.",
+        "interactionHint": "Start with Ring flip to see axial and equatorial positions exchange."
+      }
     },
     "challenge": {
       "screenSummary": {
@@ -76,9 +84,90 @@
         "interactionHint": "Explore the simulation by interacting with its controls."
       },
       "currentDetails": "The simulation is in its initial state."
+    },
+    "stereo": {
+      "viewer": "3D molecule viewer",
+      "viewerHelp": "Use the arrow keys to rotate, plus or minus to zoom, N or P to move between atoms, and Enter or Space to select.",
+      "resetView": "Reset view",
+      "atom": "{{element}} {{index}}",
+      "carbon": "Carbon",
+      "hydrogen": "Hydrogen",
+      "oxygen": "Oxygen",
+      "chlorine": "Chlorine",
+      "rotate": "Rotate the molecule",
+      "zoomIn": "Zoom in",
+      "zoomOut": "Zoom out",
+      "nextAtom": "Next atom",
+      "previousAtom": "Previous atom",
+      "pickAtom": "Select the atom",
+      "newmanSmall": "Change the angle by 5 degrees",
+      "newmanLarge": "Change the angle by 60 degrees",
+      "newmanHelp": "Use left or right arrow for 5 degrees. Hold Shift for 60 degrees.",
+      "viewerShortcuts": "Molecule viewer",
+      "stereocentre": "{{element}} {{index}}, stereocentre"
     }
   },
   "preferences": {
     "title": "Simulation"
+  },
+  "stereo": {
+    "molecule": "Molecule",
+    "preset": "Preset",
+    "custom": "Custom",
+    "molecule3D": "3D molecule",
+    "newman": "Newman projection",
+    "energyProfile": "Energy profile",
+    "angle": "Dihedral angle (°)",
+    "energy": "Energy (kJ/mol)",
+    "energyValue": "E = {{value}} kJ/mol",
+    "animate": "Animate",
+    "temperature": "Temperature (K)",
+    "angleValue": "{{value}}°",
+    "temperatureValue": "{{value}} K",
+    "population": "Staggered populations",
+    "percentNamed": "{{name}} {{value}}%",
+    "eclipsed": "Eclipsed",
+    "staggered": "Staggered",
+    "gauche": "Gauche",
+    "anti": "Anti",
+    "totallyEclipsed": "Totally eclipsed",
+    "intermediate": "Intermediate",
+    "methylFormula": "CH<sub>3</sub>",
+    "hydrogenFormula": "H",
+    "chairA": "Chair A",
+    "chairB": "Chair B",
+    "halfChair": "Half-chair",
+    "twistBoat": "Twist-boat",
+    "progress": "Flip progress",
+    "flip": "Ring flip",
+    "bondTypes": "Color axial and equatorial bonds",
+    "diaxial": "Show 1,3-diaxial interactions",
+    "axial": "Axial",
+    "equatorial": "Equatorial",
+    "deltaG": "ΔG (B − A) = {{value}} kJ/mol",
+    "ratio": "K (A/B) = {{value}}",
+    "chairPopulations": "Chair A {{a}}% · Chair B {{b}}%",
+    "strain": "Strain A / B: {{a}} / {{b}} kJ/mol",
+    "cis": "cis",
+    "trans": "trans",
+    "relative": "Relative configuration: {{value}}",
+    "notApplicable": "—",
+    "editor": "Substituent editor",
+    "selectCarbon": "Pick a ring carbon",
+    "selectedCarbon": "Carbon {{index}}",
+    "group": "Group",
+    "face": "Face",
+    "up": "Up",
+    "down": "Down",
+    "add": "Add",
+    "remove": "Remove",
+    "groups": {
+      "methyl": "Methyl",
+      "ethyl": "Ethyl",
+      "isopropyl": "Isopropyl",
+      "tertButyl": "tert-Butyl",
+      "hydroxyl": "Hydroxyl",
+      "chloro": "Chloro"
+    }
   }
 }

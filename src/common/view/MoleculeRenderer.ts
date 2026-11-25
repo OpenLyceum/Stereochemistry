@@ -99,6 +99,7 @@ type RenderInput = {
   readonly width: number;
   readonly height: number;
   readonly state: DisplayState;
+  readonly bondColor?: (a: number, b: number) => number | undefined;
   readonly positions: Float64Array;
   readonly rotation: Rotation3;
   readonly center: Vec3;
@@ -178,11 +179,11 @@ export class MoleculeRenderer {
   }
 
   /** Front-most atom whose disc contains (x, y), or null. */
-  public pick(x: number, y: number): number | null {
+  public pick(x: number, y: number, accept?: (index: number) => boolean): number | null {
     let best: number | null = null;
     let bestZ = Number.NEGATIVE_INFINITY;
     for (let i = 0; i < this.sx.length; i++) {
-      if (!this.pickable[i]) {
+      if (!this.pickable[i] || (accept && !accept(i))) {
         continue;
       }
       const r = Math.max(this.sr[i] ?? 0, MIN_PICK_RADIUS);
@@ -326,6 +327,7 @@ export class MoleculeRenderer {
     const trimB = bondTrim(this.sr[b] ?? 0, width, len);
     const multiple = bondStrandCount(bond.order, roundSymmetric(bond.order));
     const { strandWidth, spacing } = bondStrandLayout(width, multiple, line);
+    const bondColor = input.bondColor?.(a, b);
     this.addBondStrands(bond, a, b, {
       ax,
       ay,
@@ -340,8 +342,8 @@ export class MoleculeRenderer {
       multiple,
       strandWidth,
       spacing,
-      ca: state.colors[a] ?? 0,
-      cb: state.colors[b] ?? 0,
+      ca: bondColor ?? state.colors[a] ?? 0,
+      cb: bondColor ?? state.colors[b] ?? 0,
     });
   }
 

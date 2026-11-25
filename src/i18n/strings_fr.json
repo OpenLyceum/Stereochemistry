@@ -54,20 +54,28 @@
       "currentDetails": "La simulation est dans son état initial."
     },
     "conformations": {
+      "currentDetails": "{{molecule}} à {{angle}}. {{energy}}.",
+      "angleDescription": "{{value}} degrés, {{name}}",
+      "angleName": "Angle dièdre",
+      "temperatureDescription": "{{value}} kelvins",
       "screenSummary": {
-        "playArea": "La zone de jeu affiche le contenu principal de la simulation.",
-        "controlArea": "La zone de contrôle comporte un bouton Tout réinitialiser qui ramène la simulation à son état initial.",
-        "interactionHint": "Explorez la simulation en interagissant avec ses commandes."
-      },
-      "currentDetails": "La simulation est dans son état initial."
+        "playArea": "La molécule en 3D, la projection de Newman et la courbe montrent le même angle dièdre.",
+        "controlArea": "Choisissez une molécule, modifiez l’angle, animez la rotation ou réglez la température.",
+        "interactionHint": "Commencez par modifier l’angle dièdre et observez l’énergie."
+      }
     },
     "cyclohexane": {
+      "currentDetails": "{{preset}}. {{populations}}. {{relative}}.",
+      "flipped": "Cycle inversé.",
+      "nowAxial": "Carbone {{index}}, le groupe {{group}} est maintenant en position axiale.",
+      "nowEquatorial": "Carbone {{index}}, le groupe {{group}} est maintenant en position équatoriale.",
+      "progressDescription": "{{value}} pour cent du trajet d’inversion",
+      "viewerHelp": "Sélectionnez un carbone du cycle pour modifier ses substituants. Utilisez N ou P pour parcourir les carbones et Entrée ou Espace pour sélectionner.",
       "screenSummary": {
-        "playArea": "La zone de jeu affiche le contenu principal de la simulation.",
-        "controlArea": "La zone de contrôle comporte un bouton Tout réinitialiser qui ramène la simulation à son état initial.",
-        "interactionHint": "Explorez la simulation en interagissant avec ses commandes."
-      },
-      "currentDetails": "La simulation est dans son état initial."
+        "playArea": "Une structure de cyclohexane orientable et une courbe énergétique montrent le déroulement de l’inversion du cycle.",
+        "controlArea": "Choisissez un préréglage, inversez le cycle ou modifiez les groupes attachés à un carbone du cycle.",
+        "interactionHint": "Commencez par inverser le cycle pour voir les positions axiales et équatoriales s’échanger."
+      }
     },
     "challenge": {
       "screenSummary": {
@@ -76,9 +84,90 @@
         "interactionHint": "Explorez la simulation en interagissant avec ses commandes."
       },
       "currentDetails": "La simulation est dans son état initial."
+    },
+    "stereo": {
+      "viewer": "Visionneuse moléculaire 3D",
+      "viewerHelp": "Utilisez les flèches pour tourner, plus ou moins pour zoomer, N ou P pour parcourir les atomes, et Entrée ou Espace pour sélectionner.",
+      "resetView": "Réinitialiser la vue",
+      "atom": "{{element}} {{index}}",
+      "carbon": "Carbone",
+      "hydrogen": "Hydrogène",
+      "oxygen": "Oxygène",
+      "chlorine": "Chlore",
+      "rotate": "Tourner la molécule",
+      "zoomIn": "Agrandir",
+      "zoomOut": "Réduire",
+      "nextAtom": "Atome suivant",
+      "previousAtom": "Atome précédent",
+      "pickAtom": "Sélectionner l’atome",
+      "newmanSmall": "Modifier l’angle de 5 degrés",
+      "newmanLarge": "Modifier l’angle de 60 degrés",
+      "newmanHelp": "Utilisez les flèches gauche et droite pour avancer de 5 degrés. Maintenez Maj pour avancer de 60 degrés.",
+      "viewerShortcuts": "Visionneuse moléculaire",
+      "stereocentre": "{{element}} {{index}}, centre stéréogène"
     }
   },
   "preferences": {
     "title": "Simulation"
+  },
+  "stereo": {
+    "molecule": "Molécule",
+    "preset": "Préréglage",
+    "custom": "Personnalisé",
+    "molecule3D": "Molécule en 3D",
+    "newman": "Projection de Newman",
+    "energyProfile": "Profil énergétique",
+    "angle": "Angle dièdre (°)",
+    "energy": "Énergie (kJ/mol)",
+    "energyValue": "E = {{value}} kJ/mol",
+    "animate": "Animer",
+    "temperature": "Température (K)",
+    "angleValue": "{{value}}°",
+    "temperatureValue": "{{value}} K",
+    "population": "Populations des conformères décalés",
+    "percentNamed": "{{name}} {{value}} %",
+    "eclipsed": "Éclipsée",
+    "staggered": "Décalée",
+    "gauche": "Gauche",
+    "anti": "Anti",
+    "totallyEclipsed": "Totalement éclipsée",
+    "intermediate": "Intermédiaire",
+    "methylFormula": "CH<sub>3</sub>",
+    "hydrogenFormula": "H",
+    "chairA": "Chaise A",
+    "chairB": "Chaise B",
+    "halfChair": "Demi-chaise",
+    "twistBoat": "Bateau tordu",
+    "progress": "Progression de l’inversion",
+    "flip": "Inverser le cycle",
+    "bondTypes": "Colorer les liaisons axiales et équatoriales",
+    "diaxial": "Afficher les interactions 1,3-diaxiales",
+    "axial": "Axial",
+    "equatorial": "Équatorial",
+    "deltaG": "ΔG (B − A) = {{value}} kJ/mol",
+    "ratio": "K (A/B) = {{value}}",
+    "chairPopulations": "Chaise A {{a}} % · Chaise B {{b}} %",
+    "strain": "Tension A / B : {{a}} / {{b}} kJ/mol",
+    "cis": "cis",
+    "trans": "trans",
+    "relative": "Configuration relative : {{value}}",
+    "notApplicable": "—",
+    "editor": "Substituants",
+    "selectCarbon": "Choisissez un carbone du cycle",
+    "selectedCarbon": "Carbone {{index}}",
+    "group": "Groupe",
+    "face": "Face",
+    "up": "Haut",
+    "down": "Bas",
+    "add": "Ajouter",
+    "remove": "Retirer",
+    "groups": {
+      "methyl": "Méthyle",
+      "ethyl": "Éthyle",
+      "isopropyl": "Isopropyle",
+      "tertButyl": "tert-Butyle",
+      "hydroxyl": "Hydroxyle",
+      "chloro": "Chloro"
+    }
   }
 }

@@ -1,151 +1,320 @@
-/**
- * CyclohexaneScreenView.ts
- *
- * The top-level view for the simulation screen.
- *
- * All visual nodes are added here. Follow these conventions:
- *   - Use this.layoutBounds for positioning (never magic pixel values)
- *   - Keep a ResetAllButton that calls model.reset() and this.reset()
- *   - Override step(dt) for frame-by-frame animation
- *
- * ── Adding content ────────────────────────────────────────────────────────────
- * 1. Create Node subclasses in separate files (e.g. StereochemistryControlPanel.ts)
- * 2. Instantiate them here and call this.addChild(...)
- * 3. Link them to model properties:
- *      model.isRunningProperty.link( isRunning => { ... } );
- *
- * ── Layout bounds ─────────────────────────────────────────────────────────────
- * SceneryStack uses a virtual 1024×618 coordinate space by default.
- * this.layoutBounds gives you the full rectangle; use it for alignment:
- *   center, minX, maxX, minY, maxY, width, height
- */
-
+import { DerivedProperty, Multilink, PatternStringProperty, Property } from "scenerystack/axon";
+import { Bounds2, Range, toFixed } from "scenerystack/dot";
 import { type EmptySelfOptions, optionize } from "scenerystack/phet-core";
-import { Node, Rectangle } from "scenerystack/scenery";
+import { HBox, Node, VBox } from "scenerystack/scenery";
 import { ResetAllButton } from "scenerystack/scenery-phet";
 import { ScreenView, type ScreenViewOptions } from "scenerystack/sim";
-import { FLAT_RESET_ALL_BUTTON_OPTIONS } from "../../common/StereochemistryButtonOptions.js";
-import StereochemistryColors from "../../StereochemistryColors.js";
-import { SCREEN_VIEW_MARGIN } from "../../StereochemistryConstants.js";
+import { AquaRadioButtonGroup, ComboBox, HSlider } from "scenerystack/sun";
+import { type RingSubstituent, slotIndex } from "../../common/model/Cyclohexane.js";
+import {
+  FLAT_RESET_ALL_BUTTON_OPTIONS,
+  LIGHT_SURFACE_TEXT_FILL,
+  STEREOCHEMISTRY_COMBO_BOX_OPTIONS,
+} from "../../common/StereochemistryButtonOptions.js";
+import { StereochemistryPanel } from "../../common/StereochemistryPanel.js";
+import { EnergyChartNode } from "../../common/view/EnergyChartNode.js";
+import { MoleculeChooserNode } from "../../common/view/MoleculeChooserNode.js";
+import { STEREO_SLIDER_OPTIONS, stereoButton, stereoCheckbox, stereoText } from "../../common/view/StereoControls.js";
+import { StereoViewerNode } from "../../common/view/StereoViewerNode.js";
+import { StringManager } from "../../i18n/StringManager.js";
+import Colors from "../../StereochemistryColors.js";
+import {
+  STEREO_LAYOUT_SETTINGS as LAYOUT,
+  CYCLOHEXANE_SETTINGS as RING,
+  SCREEN_VIEW_MARGIN,
+  CYCLOHEXANE_SCREEN_SETTINGS as SETTINGS,
+} from "../../StereochemistryConstants.js";
 import type { CyclohexaneModel } from "../model/CyclohexaneModel.js";
+import { chairPopulationsProperty, relativeConfigurationProperty } from "./ChairReadouts.js";
 import { CyclohexaneScreenSummaryContent } from "./CyclohexaneScreenSummaryContent.js";
 
 export type CyclohexaneScreenViewOptions = ScreenViewOptions;
 
+type Group = Exclude<RingSubstituent["group"], "H">;
+type Face = RingSubstituent["face"];
+
 export class CyclohexaneScreenView extends ScreenView {
   public constructor(model: CyclohexaneModel, providedOptions?: CyclohexaneScreenViewOptions) {
-    // ── Accessibility: screen summary ───────────────────────────────────────────
-    // The screen summary is the first thing a screen-reader user encounters. It
-    // is registered here, in the ScreenView's super() options, so every sim wires
-    // it the same way. See CyclohexaneScreenSummaryContent for the four content regions.
-    const options = optionize<CyclohexaneScreenViewOptions, EmptySelfOptions, ScreenViewOptions>()(
-      {
-        screenSummaryContent: new CyclohexaneScreenSummaryContent(model),
-      },
-      providedOptions,
+    super(
+      optionize<CyclohexaneScreenViewOptions, EmptySelfOptions, ScreenViewOptions>()(
+        { screenSummaryContent: new CyclohexaneScreenSummaryContent(model) },
+        providedOptions,
+      ),
     );
-    super(options);
 
-    // ── Background ────────────────────────────────────────────────────────────
-    // A full-screen rectangle that follows the active color profile.
-    // Replace or remove once you add real content.
-    const backgroundRect = new Rectangle(0, 0, this.layoutBounds.width, this.layoutBounds.height, {
-      fill: StereochemistryColors.backgroundColorProperty,
+    const manager = StringManager.getInstance();
+    const strings = manager.getStereoStrings();
+    const a11y = manager.getCyclohexaneA11yStrings();
+    const sharedA11y = manager.getStereoA11yStrings();
+    const groupNames = new Map<Group, typeof strings.groups.methylStringProperty>([
+      ["CH3", strings.groups.methylStringProperty],
+      ["CH2CH3", strings.groups.ethylStringProperty],
+      ["CH(CH3)2", strings.groups.isopropylStringProperty],
+      ["C(CH3)3", strings.groups.tertButylStringProperty],
+      ["OH", strings.groups.hydroxylStringProperty],
+      ["Cl", strings.groups.chloroStringProperty],
+    ]);
+
+    const colorFor = (index: number) => {
+      if (!model.showBondTypesProperty.value) {
+        return undefined;
+      }
+      const { axial, slotAtoms } = model.ringProperty.value;
+      const slot = slotAtoms.indexOf(index);
+      if (slot < 0) {
+        return undefined;
+      }
+      return (axial[slot] ? Colors.axialColorProperty : Colors.equatorialColorProperty).value.toNumber();
+    };
+    const viewer = new StereoViewerNode(
+      model.stereoViewModel,
+      new Bounds2(0, 0, LAYOUT.CHAIR_VIEWPORT_WIDTH, LAYOUT.VIEWPORT_HEIGHT),
+      {
+        helpText: a11y.viewerHelpStringProperty,
+        canPick: (index) => index < RING.RING_SIZE,
+        appearanceDependencies: [model.showBondTypesProperty],
+        atomColor: colorFor,
+        bondColor: (a, b) => (a < RING.RING_SIZE ? colorFor(b) : b < RING.RING_SIZE ? colorFor(a) : undefined),
+      },
+    );
+    const resetView = stereoButton(sharedA11y.resetViewStringProperty, () => model.stereoViewModel.resetView());
+    const bondLegend = new HBox({
+      spacing: LAYOUT.GAP,
+      children: [
+        stereoText(strings.axialStringProperty, LAYOUT.FONT_SIZE, Colors.axialColorProperty),
+        stereoText(strings.equatorialStringProperty, LAYOUT.FONT_SIZE, Colors.equatorialColorProperty),
+      ],
     });
-    this.addChild(backgroundRect);
+    model.showBondTypesProperty.link((visible) => {
+      bondLegend.visible = visible;
+    });
+    const viewerColumn = new VBox({
+      spacing: LAYOUT.ROW_GAP,
+      children: [
+        stereoText(strings.molecule3DStringProperty, LAYOUT.HEADING_FONT_SIZE),
+        viewer,
+        new HBox({ children: [resetView, bondLegend], spacing: LAYOUT.GAP }),
+      ],
+    });
 
-    // ── Accessibility: per-control names ────────────────────────────────────────
-    // EVERY interactive node must carry an `accessibleName` (and an
-    // `accessibleHelpText` where useful), sourced from the StringManager `a11y`
-    // string group — never a hard-coded English literal. Sun/scenery-phet controls
-    // (NumberControl, Checkbox, ComboBox, AquaRadioButtonGroup, …) accept it as an
-    // option; a draggable plain Node needs `tagName: "div", focusable: true` too.
-    // Example (uncomment and adapt when you add a real control; add the
-    // `a11y.controls.startButton` string to every strings_*.json first):
-    //
-    //   const a11y = StringManager.getInstance().getA11yStrings();
-    //   const startButton = new RectangularPushButton({
-    //     ...FLAT_RECTANGULAR_BUTTON_OPTIONS, // flat appearance, not SceneryStack's default 3-D look
-    //     content: someIcon,
-    //     listener: () => model.start(),
-    //     accessibleName: a11y.controls.startButtonStringProperty,
-    //   });
-    //   this.addChild(startButton);
+    const landmarkNames = [
+      strings.chairAStringProperty,
+      strings.halfChairStringProperty,
+      strings.twistBoatStringProperty,
+      strings.halfChairStringProperty,
+      strings.chairBStringProperty,
+    ];
+    const chart = new EnergyChartNode({
+      width: LAYOUT.CHAIR_CHART_WIDTH,
+      xRange: model.flipProperty.range,
+      yRange: new Range(0, SETTINGS.CHART_MIN_MAX_ENERGY),
+      xTick: SETTINGS.CHART_PROGRESS_TICK,
+      yTick: SETTINGS.CHART_ENERGY_TICK,
+      xLabel: strings.progressStringProperty,
+      yLabel: strings.energyStringProperty,
+      curveProperty: model.curveProperty,
+      markerXProperty: model.flipProperty,
+      markerEnergyProperty: model.energyProperty,
+      namedPoints: RING.ENERGY_KEYFRAMES.map(([x], i) => ({
+        x,
+        label: landmarkNames[i] ?? strings.halfChairStringProperty,
+      })),
+      expandYRange: true,
+    });
+    const chartColumn = new VBox({
+      spacing: LAYOUT.GAP,
+      children: [stereoText(strings.energyProfileStringProperty, LAYOUT.HEADING_FONT_SIZE), chart],
+    });
 
-    // ── Reset All button ──────────────────────────────────────────────────────
-    // Always position at bottom-right (PhET convention).
-    const resetAllButton = new ResetAllButton({
+    const deltaProperty = new DerivedProperty([model.equilibriumProperty], (value) => value.ΔG);
+    const ratioProperty = new DerivedProperty([model.equilibriumProperty], ({ K }) =>
+      Intl.NumberFormat(undefined, { maximumSignificantDigits: 3 }).format(K),
+    );
+    const strainAProperty = new DerivedProperty([model.strainProperty], ({ A }) => A);
+    const strainBProperty = new DerivedProperty([model.strainProperty], ({ B }) => B);
+    const readout = new StereochemistryPanel(
+      new VBox({
+        spacing: LAYOUT.GAP,
+        align: "left",
+        children: [
+          stereoText(chairPopulationsProperty(model), LAYOUT.HEADING_FONT_SIZE),
+          stereoText(
+            new PatternStringProperty(
+              strings.strainStringProperty,
+              { a: strainAProperty, b: strainBProperty },
+              { decimalPlaces: 1 },
+            ),
+          ),
+          stereoText(
+            new PatternStringProperty(strings.deltaGStringProperty, { value: deltaProperty }, { decimalPlaces: 1 }),
+          ),
+          stereoText(new PatternStringProperty(strings.ratioStringProperty, { value: ratioProperty })),
+          stereoText(relativeConfigurationProperty(model)),
+        ],
+      }),
+    );
+
+    const listParent = new Node();
+    const chooser = new MoleculeChooserNode(
+      model.presetProperty,
+      "cyclohexane",
+      listParent,
+      strings.presetStringProperty,
+      {
+        id: "custom",
+        label: strings.customStringProperty,
+      },
+    );
+    const flip = stereoButton(strings.flipStringProperty, () => model.startFlip());
+    const progress = new HSlider(model.flipProperty, model.flipProperty.range, {
+      ...STEREO_SLIDER_OPTIONS,
+      accessibleName: strings.progressStringProperty,
+      keyboardStep: SETTINGS.SLIDER_STEP,
+      startDrag: () => {
+        model.flippingProperty.value = false;
+      },
+      pdomDependencies: [a11y.progressDescriptionStringProperty],
+      pdomCreateAriaValueText: (value) =>
+        a11y.progressDescriptionStringProperty.value.replace("{{value}}", toFixed(100 * (value ?? 0), 0)),
+    });
+    const bondTypes = stereoCheckbox(model.showBondTypesProperty, strings.bondTypesStringProperty);
+    const diaxial = stereoCheckbox(model.showDiaxialProperty, strings.diaxialStringProperty);
+    const flipControls = new StereochemistryPanel(
+      new VBox({
+        align: "left",
+        spacing: LAYOUT.ROW_GAP,
+        children: [
+          new HBox({ children: [stereoText(strings.presetStringProperty), chooser], spacing: LAYOUT.ROW_GAP }),
+          new HBox({ children: [flip, progress], spacing: LAYOUT.GAP }),
+          bondTypes,
+          diaxial,
+        ],
+      }),
+    );
+
+    const groupProperty = new Property<Group>("CH3");
+    const faceProperty = new Property<Face>("up");
+    const groupCombo = new ComboBox(
+      groupProperty,
+      [...groupNames].map(([value, label]) => ({
+        value,
+        createNode: () => stereoText(label, LAYOUT.FONT_SIZE, LIGHT_SURFACE_TEXT_FILL),
+        accessibleName: label,
+      })),
+      listParent,
+      { ...STEREOCHEMISTRY_COMBO_BOX_OPTIONS, accessibleName: strings.groupStringProperty, listPosition: "above" },
+    );
+    const faceOptions = [
+      { value: "up" as const, label: strings.upStringProperty },
+      { value: "down" as const, label: strings.downStringProperty },
+    ];
+    const faceRadio = new AquaRadioButtonGroup<Face>(
+      faceProperty,
+      faceOptions.map(({ value, label }) => ({
+        value,
+        createNode: () => stereoText(label),
+        options: { accessibleName: label },
+      })),
+      { orientation: "horizontal", spacing: LAYOUT.GAP, accessibleName: strings.faceStringProperty },
+    );
+    const selection = model.stereoViewModel.pickedAtomProperty;
+    const selectedCarbonProperty = new DerivedProperty(
+      [selection, strings.selectedCarbonStringProperty, strings.selectCarbonStringProperty],
+      (carbon, pattern, hint) => (carbon === null ? hint : pattern.replace("{{index}}", String(carbon + 1))),
+    );
+    const edit = (group: RingSubstituent["group"]) => {
+      const carbon = selection.value;
+      if (carbon !== null) {
+        model.editSubstituent({ carbon, group, face: faceProperty.value });
+      }
+    };
+    const add = stereoButton(strings.addStringProperty, () => edit(groupProperty.value));
+    const remove = stereoButton(strings.removeStringProperty, () => edit("H"));
+    Multilink.multilink([selection, faceProperty, model.substituentsProperty], (carbon, face, subs) => {
+      add.enabled = carbon !== null;
+      remove.enabled =
+        carbon !== null && subs.some((sub) => sub.carbon === carbon && sub.face === face && sub.group !== "H");
+    });
+    const editor = new StereochemistryPanel(
+      new VBox({
+        align: "left",
+        spacing: LAYOUT.ROW_GAP,
+        children: [
+          stereoText(strings.editorStringProperty, LAYOUT.HEADING_FONT_SIZE),
+          stereoText(selectedCarbonProperty),
+          new HBox({
+            children: [
+              stereoText(strings.groupStringProperty),
+              groupCombo,
+              stereoText(strings.faceStringProperty),
+              faceRadio,
+            ],
+            spacing: LAYOUT.ROW_GAP,
+          }),
+          new HBox({ children: [add, remove], spacing: LAYOUT.ROW_GAP }),
+        ],
+      }),
+    );
+
+    model.flipCompletedEmitter.addListener(() => {
+      const descriptions = model.substituentsProperty.value.flatMap(({ carbon, group, face }) => {
+        const label = group !== "H" && groupNames.get(group);
+        if (!label) {
+          return [];
+        }
+        const axial = model.ringProperty.value.axial[slotIndex(carbon, face)];
+        const pattern = axial ? a11y.nowAxialStringProperty.value : a11y.nowEquatorialStringProperty.value;
+        return pattern.replace("{{group}}", label.value).replace("{{index}}", String(carbon + 1));
+      });
+      flip.addAccessibleResponse([a11y.flippedStringProperty.value, ...descriptions].join(" "));
+    });
+
+    const diagrams = new HBox({
+      children: [viewerColumn, chartColumn, readout],
+      align: "top",
+      spacing: LAYOUT.GAP,
+      centerX: this.layoutBounds.centerX,
+      top: this.layoutBounds.minY + SCREEN_VIEW_MARGIN,
+    });
+    const controls = new HBox({
+      children: [flipControls, editor],
+      align: "top",
+      spacing: LAYOUT.GAP,
+      centerX: this.layoutBounds.centerX,
+      top: this.layoutBounds.minY + LAYOUT.PANEL_TOP,
+    });
+    const resetAll = new ResetAllButton({
       ...FLAT_RESET_ALL_BUTTON_OPTIONS,
       listener: () => {
+        this.interruptSubtreeInput();
         model.reset();
-        this.reset();
+        faceProperty.reset();
+        groupProperty.reset();
       },
       right: this.layoutBounds.maxX - SCREEN_VIEW_MARGIN,
       bottom: this.layoutBounds.maxY - SCREEN_VIEW_MARGIN,
     });
-    this.addChild(resetAllButton);
-
-    // ── Accessibility: keyboard / reading traversal order ───────────────────────
-    // Make the parallel DOM (Tab order and screen-reader reading order)
-    // deterministic and independent of child z-order. ScreenView throws if you
-    // set pdomOrder on itself, so add a lightweight wrapper Node that "borrows"
-    // the interactive nodes in the order a user should reach them — Reset All
-    // last. Non-interactive decoration (background, placeholder) is omitted.
+    this.addChild(diagrams);
+    this.addChild(controls);
+    this.addChild(resetAll);
+    this.addChild(listParent);
     this.addChild(
       new Node({
         pdomOrder: [
-          // TODO: add the sim's interactive nodes here, in traversal order
-          resetAllButton,
+          viewer,
+          resetView,
+          chooser,
+          flip,
+          progress,
+          bondTypes,
+          diaxial,
+          groupCombo,
+          faceRadio,
+          add,
+          remove,
+          resetAll,
         ],
       }),
     );
   }
-
-  /**
-   * Resets view-side state (animations, panel visibility, etc.).
-   * Called by the Reset All button listener.
-   */
-  public reset(): void {
-    // TODO: reset any view-side state here
-  }
-
-  /**
-   * Steps the view forward by dt seconds for animation.
-   * @param _dt - elapsed time in seconds
-   */
-  public override step(_dt: number): void {
-    // TODO: implement animation updates here
-  }
-
-  // ── Accessibility / listeners: dispose ─────────────────────────────────────
-  // ScreenView is `isDisposable: false` and lives for the whole sim, so this
-  // class rarely needs dispose(). Child Nodes (and a live currentDetails
-  // DerivedProperty you own on a short-lived object) do. When you add
-  // DerivedProperty / Multilink / Property.link against model state, keep the
-  // references and tear them down — forks copy what they see. Pattern:
-  //
-  // private readonly disposeCyclohexaneScreenView: () => void;
-  //
-  // // in the constructor, after creating the listeners:
-  // const statusMultilink = Multilink.multilink(
-  //   [model.someProperty, model.otherProperty],
-  //   (a, b) => { /* update view from model */ },
-  // );
-  // const detailsProperty = new DerivedProperty(
-  //   [model.stateProperty],
-  //   (state) => `State: ${state}`,
-  // ); // → pass as currentDetailsContent in CyclohexaneScreenSummaryContent
-  // const onExternal = (v: number) => { /* … */ };
-  // model.externalProperty.link(onExternal); // Property you do NOT own
-  //
-  // this.disposeCyclohexaneScreenView = () => {
-  //   statusMultilink.dispose();                 // Multilink you created
-  //   detailsProperty.dispose();                 // DerivedProperty you created
-  //   model.externalProperty.unlink(onExternal); // undo external link
-  // };
-  //
-  // public override dispose(): void {
-  //   this.disposeCyclohexaneScreenView();
-  //   super.dispose();
-  // }
 }

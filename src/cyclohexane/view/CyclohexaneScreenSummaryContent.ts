@@ -1,40 +1,36 @@
-/**
- * CyclohexaneScreenSummaryContent.ts
- *
- * The accessible screen summary read by screen readers (SceneryStack's
- * Interactive Description). It appears at the top of the parallel DOM and gives
- * a non-visual user a way to orient themselves and to re-read the simulation's
- * current state at any time.
- *
- * A summary has four regions (all optional, but provide at least the first
- * three in every sim for consistency across OpenLyceum):
- *   - playAreaContent       — what the play area contains
- *   - controlAreaContent    — what the controls do
- *   - currentDetailsContent — a LIVE paragraph describing current state
- *   - interactionHintContent — a short hint on how to get started
- *
- * ── Making "current details" live ─────────────────────────────────────────────
- * The template has no model state, so currentDetails is a static string. In a
- * real sim, build a DerivedProperty over the relevant model Properties and pass
- * it as `currentDetailsContent` so the paragraph updates as the sim runs.
- * See LunarLander/src/.../LunarLanderScreenSummaryContent.ts for the pattern.
- * If that DerivedProperty (or any Multilink) is owned by a short-lived object,
- * dispose it on teardown — see the commented dispose() stub in CyclohexaneScreenView.
- */
+import { DerivedProperty, PatternStringProperty } from "scenerystack/axon";
 import { ScreenSummaryContent } from "scenerystack/sim";
+import { CYCLOHEXANE_LIBRARY } from "../../common/model/MoleculeLibrary.js";
 import { StringManager } from "../../i18n/StringManager.js";
 import type { CyclohexaneModel } from "../model/CyclohexaneModel.js";
+import { chairPopulationsProperty, relativeConfigurationProperty } from "./ChairReadouts.js";
 
 export class CyclohexaneScreenSummaryContent extends ScreenSummaryContent {
-  // `model` is unused in the template but kept in the signature so real sims can
-  // derive a live currentDetailsContent from it without changing call sites.
-  public constructor(_model: CyclohexaneModel) {
-    const a11y = StringManager.getInstance().getCyclohexaneA11yStrings();
-
+  public constructor(model: CyclohexaneModel) {
+    const manager = StringManager.getInstance();
+    const a11y = manager.getCyclohexaneA11yStrings();
+    const strings = manager.getStereoStrings();
+    const names = manager.getMoleculeNames();
+    // All preset labels update in the same locale switch.
+    const presetProperty = DerivedProperty.deriveAny(
+      [
+        model.presetProperty,
+        strings.customStringProperty,
+        ...CYCLOHEXANE_LIBRARY.map(({ id }) => names[`${id}StringProperty`]),
+      ],
+      () => {
+        const id = model.presetProperty.value;
+        return id === "custom" ? strings.customStringProperty.value : names[`${id}StringProperty`].value;
+      },
+    );
     super({
       playAreaContent: a11y.screenSummary.playAreaStringProperty,
       controlAreaContent: a11y.screenSummary.controlAreaStringProperty,
-      currentDetailsContent: a11y.currentDetailsStringProperty,
+      currentDetailsContent: new PatternStringProperty(a11y.currentDetailsStringProperty, {
+        preset: presetProperty,
+        populations: chairPopulationsProperty(model),
+        relative: relativeConfigurationProperty(model),
+      }),
       interactionHintContent: a11y.screenSummary.interactionHintStringProperty,
     });
   }

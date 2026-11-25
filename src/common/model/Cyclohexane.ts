@@ -15,7 +15,7 @@ type Group = keyof typeof A_VALUES;
 type Face = "up" | "down";
 export type RingSubstituent = { readonly carbon: number; readonly face: Face; readonly group: Group };
 
-type RingMolecule = BuiltMolecule & { axial: boolean[] };
+type RingMolecule = BuiltMolecule & { axial: boolean[]; slotAtoms: number[] };
 const { RING_SIZE } = SETTINGS;
 
 /** Heavy substituent topology, rooted at local atom zero. Each remaining carbon bonds to that root. */
@@ -87,7 +87,7 @@ function directions(previous: Vec3, centre: Vec3, next: Vec3): [Vec3, Vec3] {
   return plus[2] > minus[2] ? [plus, minus] : [minus, plus];
 }
 
-function slotIndex(carbon: number, face: Face): number {
+export function slotIndex(carbon: number, face: Face): number {
   if (!Number.isInteger(carbon) || carbon < 0 || carbon >= RING_SIZE) {
     throw new RangeError(`Invalid ring carbon ${carbon}`);
   }
@@ -125,8 +125,9 @@ function placeRingSubstituents(
   positions: Float64Array,
   graph: Adjacency,
   { expanded, heavyCount, slots }: ReturnType<typeof topology>,
-): boolean[] {
+): Pick<RingMolecule, "axial" | "slotAtoms"> {
   const axial: boolean[] = [];
+  const slotAtoms: number[] = [];
   const at = (index: number): Vec3 => positionAt(positions, index);
   for (const [carbon, centre] of ring.entries()) {
     const previous = at(wrapCarbon(carbon - 1));
@@ -145,6 +146,7 @@ function placeRingSubstituents(
       if (index === undefined || !parent || !child) {
         throw new Error("Missing ring substituent atom");
       }
+      slotAtoms.push(index);
       const length = explicit >= 0 ? bondLength(parent, child, 1) : SETTINGS.HYDROGEN_BOND;
       positions.set(
         direction.map((component, i) => (centre[i] ?? 0) + length * component),
@@ -153,7 +155,7 @@ function placeRingSubstituents(
     }
   }
 
-  return axial;
+  return { axial, slotAtoms };
 }
 
 function placeBranchSubstituents(expanded: ExpandedRing, positions: Float64Array, graph: Adjacency): Int32Array {
@@ -204,9 +206,9 @@ export function buildCyclohexane(subs: readonly RingSubstituent[], s: number): R
   for (const [carbon, point] of ring.entries()) {
     positions.set(point, 3 * carbon);
   }
-  const axial = placeRingSubstituents(ring, positions, graph, composition);
+  const slots = placeRingSubstituents(ring, positions, graph, composition);
   const parentOf = placeBranchSubstituents(expanded, positions, graph);
-  return { ...assembleMolecule("cyclohexane", expanded, positions, heavyCount, parentOf), axial };
+  return { ...assembleMolecule("cyclohexane", expanded, positions, heavyCount, parentOf), ...slots };
 }
 
 /** Interpolate consecutive ring-flip landmarks with zero slope at each keyframe. */

@@ -9,12 +9,22 @@
  * tests below using forceGC().
  */
 
+import { Bounds2, Range } from "scenerystack/dot";
 import { ChallengeModel } from "../src/challenge/model/ChallengeModel.js";
 import { ChiralityModel } from "../src/chirality/model/ChiralityModel.js";
+import { buildCyclohexane } from "../src/common/model/Cyclohexane.js";
+import { StereoViewModel } from "../src/common/model/StereoViewModel.js";
+import { EnergyChartNode } from "../src/common/view/EnergyChartNode.js";
+import { NewmanProjectionNode } from "../src/common/view/NewmanProjectionNode.js";
+import { StereoViewerNode } from "../src/common/view/StereoViewerNode.js";
 import { RSModel } from "../src/configuration/model/RSModel.js";
 import { ConformationsModel } from "../src/conformations/model/ConformationsModel.js";
 import { CyclohexaneModel } from "../src/cyclohexane/model/CyclohexaneModel.js";
+import { StringManager } from "../src/i18n/StringManager.js";
 import { describeDisposalLeaks } from "./helpers/memoryLeak.js";
+
+const conformations = new ConformationsModel();
+const strings = StringManager.getInstance().getStereoStrings();
 
 describeDisposalLeaks([
   { name: "ChiralityModel", create: () => new ChiralityModel() },
@@ -22,4 +32,33 @@ describeDisposalLeaks([
   { name: "ConformationsModel", create: () => new ConformationsModel() },
   { name: "CyclohexaneModel", create: () => new CyclohexaneModel() },
   { name: "ChallengeModel", create: () => new ChallengeModel() },
+  { name: "StereoViewModel", create: () => new StereoViewModel(buildCyclohexane([], 0)) },
+  {
+    name: "StereoViewerNode",
+    create: () => new StereoViewerNode(conformations.stereoViewModel, new Bounds2(0, 0, 300, 300)),
+    keepAlive: () => [conformations.stereoViewModel],
+  },
+  {
+    name: "NewmanProjectionNode",
+    create: () => new NewmanProjectionNode(conformations.newmanProperty, conformations.phiProperty),
+    keepAlive: () => [conformations],
+  },
+  {
+    name: "EnergyChartNode",
+    create: () =>
+      new EnergyChartNode({
+        width: 300,
+        xRange: conformations.phiProperty.range,
+        yRange: new Range(0, 22),
+        xTick: 60,
+        yTick: 5,
+        xLabel: strings.angleStringProperty,
+        yLabel: strings.energyStringProperty,
+        curveProperty: conformations.curveProperty,
+        markerXProperty: conformations.phiProperty,
+        markerEnergyProperty: conformations.energyProperty,
+        namedPoints: [{ x: 180, label: strings.antiStringProperty }],
+      }),
+    keepAlive: () => [conformations],
+  },
 ]);

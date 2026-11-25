@@ -1,40 +1,37 @@
-/**
- * ConformationsScreenSummaryContent.ts
- *
- * The accessible screen summary read by screen readers (SceneryStack's
- * Interactive Description). It appears at the top of the parallel DOM and gives
- * a non-visual user a way to orient themselves and to re-read the simulation's
- * current state at any time.
- *
- * A summary has four regions (all optional, but provide at least the first
- * three in every sim for consistency across OpenLyceum):
- *   - playAreaContent       — what the play area contains
- *   - controlAreaContent    — what the controls do
- *   - currentDetailsContent — a LIVE paragraph describing current state
- *   - interactionHintContent — a short hint on how to get started
- *
- * ── Making "current details" live ─────────────────────────────────────────────
- * The template has no model state, so currentDetails is a static string. In a
- * real sim, build a DerivedProperty over the relevant model Properties and pass
- * it as `currentDetailsContent` so the paragraph updates as the sim runs.
- * See LunarLander/src/.../LunarLanderScreenSummaryContent.ts for the pattern.
- * If that DerivedProperty (or any Multilink) is owned by a short-lived object,
- * dispose it on teardown — see the commented dispose() stub in ConformationsScreenView.
- */
+import { DerivedProperty, PatternStringProperty } from "scenerystack/axon";
 import { ScreenSummaryContent } from "scenerystack/sim";
 import { StringManager } from "../../i18n/StringManager.js";
 import type { ConformationsModel } from "../model/ConformationsModel.js";
 
 export class ConformationsScreenSummaryContent extends ScreenSummaryContent {
-  // `model` is unused in the template but kept in the signature so real sims can
-  // derive a live currentDetailsContent from it without changing call sites.
-  public constructor(_model: ConformationsModel) {
-    const a11y = StringManager.getInstance().getConformationsA11yStrings();
+  public constructor(model: ConformationsModel) {
+    const manager = StringManager.getInstance();
+    const a11y = manager.getConformationsA11yStrings();
+    const names = manager.getMoleculeNames();
+    const strings = manager.getStereoStrings();
+    const nameProperty = new DerivedProperty(
+      [model.moleculeProperty, names.ethaneStringProperty, names.propaneStringProperty, names.butaneStringProperty],
+      (molecule) => names[`${molecule}StringProperty`].value,
+    );
+    const angleProperty = new PatternStringProperty(
+      strings.angleValueStringProperty,
+      { value: model.phiProperty },
+      { decimalPlaces: 0 },
+    );
+    const energyProperty = new PatternStringProperty(
+      strings.energyValueStringProperty,
+      { value: model.energyProperty },
+      { decimalPlaces: 1 },
+    );
 
     super({
       playAreaContent: a11y.screenSummary.playAreaStringProperty,
       controlAreaContent: a11y.screenSummary.controlAreaStringProperty,
-      currentDetailsContent: a11y.currentDetailsStringProperty,
+      currentDetailsContent: new PatternStringProperty(a11y.currentDetailsStringProperty, {
+        molecule: nameProperty,
+        angle: angleProperty,
+        energy: energyProperty,
+      }),
       interactionHintContent: a11y.screenSummary.interactionHintStringProperty,
     });
   }

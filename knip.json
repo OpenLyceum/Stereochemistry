@@ -4,6 +4,7 @@
   "entry": [],
   "ignoreFiles": [],
   "ignoreDependencies": ["@swc/core"],
+  "ignoreUnresolved": ["./.dependency-cruiser.local.cjs"],
   "ignoreBinaries": ["vite!"],
   "includeEntryExports": true,
   "treatConfigHintsAsErrors": true,

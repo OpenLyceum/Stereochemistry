@@ -34,5 +34,4 @@ Stereochemistry (`stereochemistry`) is a SceneryStack simulation scaffolded from
 
 ## Compliance carve-outs
 
-- `no-unreachable-from-entry`: P1 model and renderer modules are covered by tests before P2 wires them to screens. The local overlay preserves reachability for all other source files.
-- **Template drift** `knip.json`: The unresolved-module ignore for the architecture overlay was removed because the P1 overlay resolves locally.
+None yet.

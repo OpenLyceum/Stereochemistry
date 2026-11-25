@@ -100,6 +100,50 @@ const StereochemistryColors = {
     default: "#1a1a1a",
     projector: "#1a1a1a",
   }),
+  viewerHaloColorProperty: new ProfileColorProperty(StereochemistryNamespace, "viewerHalo", {
+    default: "#f6c75b",
+    projector: "#b45309",
+  }),
+  viewerPickColorProperty: new ProfileColorProperty(StereochemistryNamespace, "viewerPick", {
+    default: "#4fc3f7",
+    projector: "#075985",
+  }),
+  measurementColorProperty: new ProfileColorProperty(StereochemistryNamespace, "measurement", {
+    default: "#ffe19b",
+    projector: "#854d0e",
+  }),
+  gridColorProperty: new ProfileColorProperty(StereochemistryNamespace, "grid", {
+    default: "#39476b",
+    projector: "#d8dee6",
+  }),
+  axialColorProperty: new ProfileColorProperty(StereochemistryNamespace, "axial", {
+    default: "#f5a85d",
+    projector: "#a64213",
+  }),
+  equatorialColorProperty: new ProfileColorProperty(StereochemistryNamespace, "equatorial", {
+    default: "#64d9c1",
+    projector: "#067769",
+  }),
+  methylColorProperty: new ProfileColorProperty(StereochemistryNamespace, "methyl", {
+    default: "#f6be72",
+    projector: "#92400e",
+  }),
+  hydrogenColorProperty: new ProfileColorProperty(StereochemistryNamespace, "hydrogen", {
+    default: "#b5caf0",
+    projector: "#344b79",
+  }),
+  curveColorProperty: new ProfileColorProperty(StereochemistryNamespace, "curve", {
+    default: "#71d9ff",
+    projector: "#036f92",
+  }),
+  chairMarkerColorProperty: new ProfileColorProperty(StereochemistryNamespace, "chairMarker", {
+    default: "#f6c75b",
+    projector: "#a44a0e",
+  }),
+  gaucheOtherColorProperty: new ProfileColorProperty(StereochemistryNamespace, "gaucheOther", {
+    default: "#aea5ef",
+    projector: "#6553a4",
+  }),
 };
 
 export default StereochemistryColors;
