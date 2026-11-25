@@ -1,0 +1,201 @@
+// Copied from OpenLyceum/MolScope@6bb92af; trimmed: unused color parser and scheme list.
+/**
+ * ColorSchemes.ts
+ *
+ * Per-atom colouring schemes, matching Jmol's names and palettes where they exist:
+ * `cpk` (element), `chain`, `structure`, `temperature` (B-factor, blue→red),
+ * `amino` (residue type), `group` (rainbow along each chain), and `formalCharge`.
+ * Colours are 0xRRGGBB integers so this module stays free of Scenery.
+ */
+
+import { roundSymmetric } from "scenerystack/dot";
+import type { Atom, Residue, Structure } from "./Structure.js";
+import { ResidueKind, SecondaryStructure } from "./Structure.js";
+
+const ColorScheme = {
+  ELEMENT: "cpk",
+  CHAIN: "chain",
+  STRUCTURE: "structure",
+  TEMPERATURE: "temperature",
+  AMINO: "amino",
+  GROUP: "group",
+  CHARGE: "formalCharge",
+} as const;
+export type ColorSchemeValue = (typeof ColorScheme)[keyof typeof ColorScheme];
+
+/** Jmol chain colours for chains A–Z (upper) — the ones users recognise from Jmol pictures. */
+const CHAIN_COLORS = [
+  0xc0d0ff, 0xb0ffb0, 0xffc0c8, 0xffff80, 0xffc0ff, 0xb0f0f0, 0xffd070, 0xf08080, 0xf5deb3, 0x00bfff, 0xcd5c5c,
+  0x66cdaa, 0x9acd32, 0xee82ee, 0x00ced1, 0x00ff7f, 0x3cb371, 0x00008b, 0xbdb76b, 0x006400, 0x800000, 0x808000,
+  0x800080, 0x008080, 0xb8860b, 0xb22222,
+];
+
+/** Jmol `structure` colours. */
+const STRUCTURE_COLORS: Record<number, number> = {
+  [SecondaryStructure.HELIX]: 0xff0080,
+  [SecondaryStructure.SHEET]: 0xffc800,
+  [SecondaryStructure.TURN]: 0x6080ff,
+  [SecondaryStructure.NONE]: 0xffffff,
+};
+const NUCLEIC_STRUCTURE_COLOR = 0xae00fe;
+
+/** Jmol `amino` colours (after RasMol). */
+const AMINO_COLORS: Record<string, number> = {
+  ALA: 0xc8c8c8,
+  ARG: 0x145aff,
+  ASN: 0x00dcdc,
+  ASP: 0xe60a0a,
+  CYS: 0xe6e600,
+  GLN: 0x00dcdc,
+  GLU: 0xe60a0a,
+  GLY: 0xebebeb,
+  HIS: 0x8282d2,
+  ILE: 0x0f820f,
+  LEU: 0x0f820f,
+  LYS: 0x145aff,
+  MET: 0xe6e600,
+  PHE: 0x3232aa,
+  PRO: 0xdc9682,
+  SER: 0xfa9600,
+  THR: 0xfa9600,
+  TRP: 0xb45ab4,
+  TYR: 0x3232aa,
+  VAL: 0x0f820f,
+  A: 0xa0a0ff,
+  DA: 0xa0a0ff,
+  G: 0xff7070,
+  DG: 0xff7070,
+  C: 0xff8c4b,
+  DC: 0xff8c4b,
+  T: 0xa0ffa0,
+  DT: 0xa0ffa0,
+  U: 0xff8080,
+};
+const AMINO_DEFAULT = 0xbea06e;
+
+/** Jmol's colour names (a useful subset of the CSS names) plus the RasMol extras. */
+/** Linear blend between two 0xRRGGBB colours. */
+function mixColors(c1: number, c2: number, t: number): number {
+  const r = roundSymmetric(((c1 >> 16) & 255) * (1 - t) + ((c2 >> 16) & 255) * t);
+  const g = roundSymmetric(((c1 >> 8) & 255) * (1 - t) + ((c2 >> 8) & 255) * t);
+  const b = roundSymmetric((c1 & 255) * (1 - t) + (c2 & 255) * t);
+  return (r << 16) | (g << 8) | b;
+}
+
+/** Jmol's "roygb" rainbow, t ∈ [0, 1] from red to blue. */
+function rainbow(t: number): number {
+  const stops = [0xff0000, 0xffa500, 0xffff00, 0x00ff00, 0x0000ff];
+  const x = Math.min(0.9999, Math.max(0, t)) * (stops.length - 1);
+  const i = Math.floor(x);
+  return mixColors(stops[i] ?? 0, stops[i + 1] ?? 0, x - i);
+}
+
+/** Blue (cold) → white → red (hot), Jmol's `temperature` "bwr" gradient. */
+function temperatureColor(t: number): number {
+  return t < 0.5 ? mixColors(0x0000ff, 0xffffff, t * 2) : mixColors(0xffffff, 0xff0000, (t - 0.5) * 2);
+}
+
+function chainColor(chain: string): number {
+  if (!chain) {
+    return 0xffffff;
+  }
+  const code = chain.toUpperCase().charCodeAt(0);
+  const index = code >= 65 && code <= 90 ? code - 65 : code % CHAIN_COLORS.length;
+  return CHAIN_COLORS[index] ?? 0xffffff;
+}
+
+/**
+ * Colours every atom whose `mask` entry is set, writing into `colors`.
+ * Element colouring is the default for atoms with no residue data.
+ */
+export function applyColorScheme(
+  structure: Structure,
+  scheme: ColorSchemeValue,
+  mask: Uint8Array,
+  colors: Uint32Array,
+): void {
+  const atoms = structure.atoms;
+  let minB = Number.POSITIVE_INFINITY;
+  let maxB = Number.NEGATIVE_INFINITY;
+  if (scheme === ColorScheme.TEMPERATURE) {
+    for (const atom of atoms) {
+      minB = Math.min(minB, atom.bFactor);
+      maxB = Math.max(maxB, atom.bFactor);
+    }
+  }
+  // Rainbow position of each residue along its chain, for `group`.
+  const groupFraction = new Float64Array(structure.residues.length);
+  if (scheme === ColorScheme.GROUP) {
+    const byChain = new Map<string, number[]>();
+    structure.residues.forEach((residue, index) => {
+      if (residue.kind === ResidueKind.AMINO || residue.kind === ResidueKind.NUCLEIC) {
+        const list = byChain.get(residue.chain) ?? [];
+        list.push(index);
+        byChain.set(residue.chain, list);
+      }
+    });
+    for (const list of byChain.values()) {
+      list.forEach((residueIndex, k) => {
+        groupFraction[residueIndex] = list.length > 1 ? k / (list.length - 1) : 0;
+      });
+    }
+  }
+
+  atoms.forEach((atom, i) => {
+    if (!mask[i]) {
+      return;
+    }
+    colors[i] = resolveSchemeColor(scheme, atom, structure.residues[atom.residueIndex], minB, maxB, groupFraction);
+  });
+}
+
+/** Per-scheme colour for one atom; falls back to the element (CPK) colour. */
+function resolveSchemeColor(
+  scheme: ColorSchemeValue,
+  atom: Atom,
+  residue: Residue | undefined,
+  minB: number,
+  maxB: number,
+  groupFraction: Float64Array,
+): number {
+  switch (scheme) {
+    case ColorScheme.CHAIN:
+      return atom.chain ? chainColor(atom.chain) : atom.element.color;
+    case ColorScheme.STRUCTURE:
+      return structureSchemeColor(atom, residue);
+    case ColorScheme.TEMPERATURE:
+      return temperatureColor(maxB > minB ? (atom.bFactor - minB) / (maxB - minB) : 0.5);
+    case ColorScheme.AMINO:
+      return aminoSchemeColor(residue) ?? atom.element.color;
+    case ColorScheme.GROUP:
+      return groupSchemeColor(atom, residue, groupFraction) ?? atom.element.color;
+    case ColorScheme.CHARGE:
+      return atom.formalCharge > 0 ? 0x3050f8 : atom.formalCharge < 0 ? 0xff0d0d : 0xffffff;
+    default:
+      return atom.element.color;
+  }
+}
+
+function structureSchemeColor(atom: Atom, residue: Residue | undefined): number {
+  if (residue?.kind === ResidueKind.NUCLEIC) {
+    return NUCLEIC_STRUCTURE_COLOR;
+  }
+  if (residue?.kind === ResidueKind.AMINO) {
+    return STRUCTURE_COLORS[atom.secondaryStructure] ?? 0xffffff;
+  }
+  return atom.element.color;
+}
+
+function aminoSchemeColor(residue: Residue | undefined): number | null {
+  if (residue && (residue.kind === ResidueKind.AMINO || residue.kind === ResidueKind.NUCLEIC)) {
+    return AMINO_COLORS[residue.name.toUpperCase()] ?? AMINO_DEFAULT;
+  }
+  return null;
+}
+
+function groupSchemeColor(atom: Atom, residue: Residue | undefined, groupFraction: Float64Array): number | null {
+  if (residue && (residue.kind === ResidueKind.AMINO || residue.kind === ResidueKind.NUCLEIC)) {
+    return rainbow(groupFraction[atom.residueIndex] ?? 0);
+  }
+  return null;
+}

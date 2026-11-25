@@ -72,6 +72,12 @@ const StereochemistryColors = {
     projector: "#1a1a1a",
   }),
 
+  /** Fallback for canvas primitives whose atom color is unavailable. */
+  moleculeFallbackColorProperty: new ProfileColorProperty(StereochemistryNamespace, "moleculeFallback", {
+    default: "#ffffff",
+    projector: "#1a1a1a",
+  }),
+
   // ── Light control surfaces ───────────────────────────────────────────────────
   // White chrome (combo boxes, flat push buttons, editable input fields) stays light
   // in both profiles; its text stays dark. Same values in default and projector mode,

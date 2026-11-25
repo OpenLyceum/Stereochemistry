@@ -92,6 +92,11 @@ export class StringManager {
     };
   }
 
+  /** Display names keyed by molecule preset identifier. */
+  public getMoleculeNames() {
+    return stringProperties.molecules;
+  }
+
   /** Accessibility strings for the Chirality screen. */
   public getChiralityA11yStrings() {
     return stringProperties.a11y.chirality;

@@ -7,6 +7,35 @@
     "cyclohexane": "Cyclohexane",
     "challenge": "Challenge"
   },
+  "molecules": {
+    "bromochlorofluoromethane": "Bromoclorofluorometano",
+    "2-butanol": "Butan-2-ol",
+    "2-bromobutane": "2-Bromobutano",
+    "lactic-acid": "Ácido láctico",
+    "alanine": "Alanina",
+    "glyceraldehyde": "Gliceraldehído",
+    "3-methylhexane": "3-Metilhexano",
+    "2,3-dibromobutane-RR": "(2R,3R)-2,3-Dibromobutano",
+    "2,3-dibromobutane-SS": "(2S,3S)-2,3-Dibromobutano",
+    "2,3-dibromobutane-meso": "meso-2,3-Dibromobutano",
+    "threonine": "Treonina",
+    "dichloromethane": "Diclorometano",
+    "2-propanol": "Propan-2-ol",
+    "3-pentanol": "Pentan-3-ol",
+    "ethane": "Etano",
+    "propane": "Propano",
+    "butane": "Butano",
+    "cyclohexane": "Ciclohexano",
+    "methylcyclohexane": "Metilciclohexano",
+    "tert-butylcyclohexane": "terc-Butilciclohexano",
+    "cis-1,2-dimethylcyclohexane": "cis-1,2-dimetilciclohexano",
+    "trans-1,2-dimethylcyclohexane": "trans-1,2-dimetilciclohexano",
+    "cis-1,3-dimethylcyclohexane": "cis-1,3-dimetilciclohexano",
+    "trans-1,3-dimethylcyclohexane": "trans-1,3-dimetilciclohexano",
+    "cis-1,4-dimethylcyclohexane": "cis-1,4-dimetilciclohexano",
+    "trans-1,4-dimethylcyclohexane": "trans-1,4-dimetilciclohexano",
+    "cis-1-tert-butyl-4-methylcyclohexane": "cis-1-terc-butil-4-metilciclohexano"
+  },
   "a11y": {
     "chirality": {
       "screenSummary": {

@@ -1,0 +1,1090 @@
+// Copied from OpenLyceum/MolScope@6bb92af; trimmed: unused type exports only.
+import { roundSymmetric } from "scenerystack/dot";
+import StereochemistryColors from "../../StereochemistryColors.js";
+import {
+  MOLECULE_RENDERER_APPEARANCE_SETTINGS as APPEARANCE,
+  MOLECULE_RENDERER_SETTINGS,
+} from "../../StereochemistryConstants.js";
+/**
+ * MoleculeRenderer.ts
+ *
+ * A painter's-algorithm renderer for the 3D viewer, drawing straight to a 2D canvas
+ * context — the same strategy as Jmol's own software renderer. Every frame it
+ * rotates and projects the atoms, builds one list of depth-tagged primitives
+ * (shaded spheres, cylinder halves, ribbon quads, tubes, polyhedron faces, dashed
+ * hydrogen bonds), sorts it back to front, and paints. Overlays (labels,
+ * measurements, halos, the unit cell, the axis gizmo) go on top.
+ *
+ * Spheres are drawn from pre-shaded sprites cached per colour, which keeps a
+ * 5000-atom protein in space-fill interactive. The renderer keeps the last
+ * projection so the view can hit-test atoms under the pointer.
+ */
+
+import type { PolymerPath } from "../model/structure/CartoonGeometry.js";
+import { TUBE_RADIUS } from "../model/structure/CartoonGeometry.js";
+import type { DisplayState } from "../model/structure/DisplayState.js";
+import { WIREFRAME_LINE } from "../model/structure/DisplayState.js";
+import type { Vec3 } from "../model/structure/Geometry.js";
+import type { Measurement } from "../model/structure/Measurement.js";
+import type { Polyhedron } from "../model/structure/Polyhedra.js";
+import type { Rotation3 } from "../model/structure/Rotation3.js";
+import type { Bond, Residue, Structure } from "../model/structure/Structure.js";
+import { ResidueKind } from "../model/structure/Structure.js";
+import type { UnitCell } from "../model/structure/UnitCell.js";
+import { CELL_EDGES } from "../model/structure/UnitCell.js";
+
+/** Camera distance in units of the bounding radius (Jmol's default `cameraDepth` is 3). */
+const CAMERA_DEPTH: number = MOLECULE_RENDERER_SETTINGS.CAMERA_DEPTH;
+/** Sprite resolution for shaded spheres, px. */
+const SPRITE_SIZE: number = MOLECULE_RENDERER_SETTINGS.SPRITE_SIZE;
+/** Sprites kept before the cache is flushed (continuous colour schemes create many). */
+const MAX_SPRITES: number = MOLECULE_RENDERER_SETTINGS.MAX_SPRITES;
+/** Thin wireframe line width, px. */
+const WIRE_WIDTH: number = MOLECULE_RENDERER_SETTINGS.WIRE_WIDTH;
+/** Minimum pick radius, px, so thin wireframe atoms are still clickable. */
+const MIN_PICK_RADIUS: number = MOLECULE_RENDERER_SETTINGS.MIN_PICK_RADIUS;
+
+const Kind = {
+  SPHERE: 0,
+  CYLINDER: 1,
+  LINE: 2,
+  QUAD: 3,
+  TUBE: 4,
+  FACE: 5,
+  DASH: 6,
+} as const;
+
+/** One depth-sorted primitive; pooled and reused between frames. */
+type Item = {
+  kind: number;
+  z: number;
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  x3: number;
+  y3: number;
+  x4: number;
+  y4: number;
+  /** Radius (sphere), width (cylinder, line, tube) in px. */
+  size: number;
+  color: number;
+  /** Lambert brightness 0–1 for flat primitives. */
+  shade: number;
+};
+
+/** Screen-space samples along a polymer path for cartoon/trace/rung drawing. */
+type PolymerProjection = {
+  projected: Float64Array;
+  factor: Float64Array;
+  nz: Float64Array;
+  gx: Float64Array;
+  gy: Float64Array;
+};
+
+type OverlayColors = {
+  readonly label: string;
+  readonly measurement: string;
+  readonly unitCell: string;
+  readonly halo: string;
+  readonly hover: string;
+  readonly pick: string;
+  readonly hydrogenBond: string;
+  readonly axisX: string;
+  readonly axisY: string;
+  readonly axisZ: string;
+};
+
+type RenderInput = {
+  readonly width: number;
+  readonly height: number;
+  readonly state: DisplayState;
+  readonly positions: Float64Array;
+  readonly rotation: Rotation3;
+  readonly center: Vec3;
+  readonly radius: number;
+  readonly zoom: number;
+  readonly perspective: boolean;
+  /** Fill colour 0xRRGGBB, or null to leave the canvas transparent. */
+  readonly background: number | null;
+  readonly paths: readonly PolymerPath[];
+  readonly hydrogenBonds: readonly Bond[] | null;
+  readonly polyhedra: readonly Polyhedron[] | null;
+  readonly unitCell: UnitCell | null;
+  readonly cellRange: Vec3;
+  readonly showAxes: boolean;
+  readonly showHalos: boolean;
+  readonly hovered: number | null;
+  readonly picked: number | null;
+  readonly pendingPicks: readonly number[];
+  readonly measurements: readonly Measurement[];
+  readonly measurementLabel: (measurement: Measurement) => string;
+  readonly axisLabels: readonly [string, string, string];
+  readonly cellLabels: readonly [string, string, string, string];
+  readonly colors: OverlayColors;
+  readonly font: string;
+};
+
+export class MoleculeRenderer {
+  private readonly items: Item[] = [];
+  private itemCount = 0;
+  private order: number[] = [];
+  private readonly sprites = new Map<number, HTMLCanvasElement>();
+  private readonly cssCache = new Map<number, string>();
+
+  // Last projection, for picking.
+  private sx = new Float32Array(0);
+  private sy = new Float32Array(0);
+  private sz = new Float32Array(0);
+  private sr = new Float32Array(0);
+  private pickable = new Uint8Array(0);
+  private scale = 1;
+  private cx = 0;
+  private cy = 0;
+  private depth = 1;
+  private perspective = true;
+  private input: RenderInput | null = null;
+
+  /** Pixels per Å at the rotation centre for the last frame. */
+  public get pixelsPerAngstrom(): number {
+    return this.scale;
+  }
+
+  public render(ctx: CanvasRenderingContext2D, input: RenderInput): void {
+    this.input = input;
+    const { width, height, state } = input;
+    if (input.background !== null) {
+      ctx.fillStyle = this.css(input.background);
+      ctx.fillRect(0, 0, width, height);
+    }
+    this.project(input);
+    this.itemCount = 0;
+    this.addAtomsAndBonds(input);
+    this.addPolymers(input);
+    if (input.hydrogenBonds) {
+      this.addHydrogenBonds(input.hydrogenBonds, state);
+    }
+    if (input.polyhedra) {
+      this.addPolyhedra(input.polyhedra, input);
+    }
+    this.paintItems(ctx);
+    if (input.unitCell) {
+      this.paintUnitCell(ctx, input.unitCell, input);
+    }
+    this.paintOverlays(ctx, input);
+    if (input.showAxes) {
+      this.paintAxes(ctx, input);
+    }
+  }
+
+  /** Front-most atom whose disc contains (x, y), or null. */
+  public pick(x: number, y: number): number | null {
+    let best: number | null = null;
+    let bestZ = Number.NEGATIVE_INFINITY;
+    for (let i = 0; i < this.sx.length; i++) {
+      if (!this.pickable[i]) {
+        continue;
+      }
+      const r = Math.max(this.sr[i] ?? 0, MIN_PICK_RADIUS);
+      const dx = (this.sx[i] ?? 0) - x;
+      const dy = (this.sy[i] ?? 0) - y;
+      if (dx * dx + dy * dy <= r * r && (this.sz[i] ?? 0) > bestZ) {
+        best = i;
+        bestZ = this.sz[i] ?? 0;
+      }
+    }
+    return best;
+  }
+
+  /** Screen position of atom i from the last frame. */
+  public screenPosition(i: number): { x: number; y: number } | null {
+    return i >= 0 && i < this.sx.length ? { x: this.sx[i] ?? 0, y: this.sy[i] ?? 0 } : null;
+  }
+
+  /** Cartesian Å displacement (model frame) for a screen-space drag of (dx, dy) px. */
+  public screenDeltaToModel(dx: number, dy: number, rotation: Rotation3): Vec3 {
+    const m = rotation.m;
+    const vx = dx / this.scale;
+    const vy = -dy / this.scale;
+    // Transpose of the rotation maps view axes back to model axes.
+    return [
+      (m[0] ?? 0) * vx + (m[3] ?? 0) * vy,
+      (m[1] ?? 0) * vx + (m[4] ?? 0) * vy,
+      (m[2] ?? 0) * vx + (m[5] ?? 0) * vy,
+    ];
+  }
+
+  // ── Projection ───────────────────────────────────────────────────────────────
+
+  private project(input: RenderInput): void {
+    const { state, positions, rotation, center, width, height } = input;
+    const n = state.atomCount;
+    if (this.sx.length !== n) {
+      this.sx = new Float32Array(n);
+      this.sy = new Float32Array(n);
+      this.sz = new Float32Array(n);
+      this.sr = new Float32Array(n);
+      this.pickable = new Uint8Array(n);
+    }
+    this.cx = width / 2;
+    this.cy = height / 2;
+    this.scale = (input.zoom * Math.min(width, height)) / 2 / (input.radius * APPEARANCE.FIT_RADIUS_FACTOR);
+    this.depth = CAMERA_DEPTH * input.radius;
+    this.perspective = input.perspective;
+    const v: Vec3 = [0, 0, 0];
+    for (let i = 0; i < n; i++) {
+      rotation.apply(
+        (positions[3 * i] ?? 0) - center[0],
+        (positions[3 * i + 1] ?? 0) - center[1],
+        (positions[3 * i + 2] ?? 0) - center[2],
+        v,
+      );
+      const f = this.perspectiveFactor(v[2]);
+      this.sx[i] = this.cx + v[0] * this.scale * f;
+      this.sy[i] = this.cy - v[1] * this.scale * f;
+      this.sz[i] = v[2];
+      this.sr[i] = (state.atomRadius[i] ?? 0) * this.scale * f;
+      this.pickable[i] = state.isDisplayed(i) ? 1 : 0;
+    }
+  }
+
+  private perspectiveFactor(z: number): number {
+    if (!this.perspective) {
+      return 1;
+    }
+    return this.depth / Math.max(this.depth - z, this.depth * APPEARANCE.MIN_PERSPECTIVE_DEPTH_RATIO);
+  }
+
+  /** Projects a model-space point (Å) to [x, y, z]. */
+  private projectPoint(p: Vec3, input: RenderInput): Vec3 {
+    const v: Vec3 = [0, 0, 0];
+    input.rotation.apply(p[0] - input.center[0], p[1] - input.center[1], p[2] - input.center[2], v);
+    const f = this.perspectiveFactor(v[2]);
+    return [this.cx + v[0] * this.scale * f, this.cy - v[1] * this.scale * f, v[2]];
+  }
+
+  // ── Building the item list ────────────────────────────────────────────────────
+
+  private item(kind: number, z: number): Item {
+    let it = this.items[this.itemCount];
+    if (!it) {
+      it = { kind, z, x1: 0, y1: 0, x2: 0, y2: 0, x3: 0, y3: 0, x4: 0, y4: 0, size: 0, color: 0, shade: 1 };
+      this.items.push(it);
+    }
+    it.kind = kind;
+    it.z = z;
+    it.shade = 1;
+    this.itemCount++;
+    return it;
+  }
+
+  private addAtomsAndBonds(input: RenderInput): void {
+    const { state } = input;
+    const n = state.atomCount;
+    for (let i = 0; i < n; i++) {
+      if (state.hidden[i] || (this.sr[i] ?? 0) <= 0) {
+        continue;
+      }
+      const it = this.item(Kind.SPHERE, this.sz[i] ?? 0);
+      it.x1 = this.sx[i] ?? 0;
+      it.y1 = this.sy[i] ?? 0;
+      it.size = this.sr[i] ?? 0;
+      it.color = state.colors[i] ?? 0;
+    }
+    for (const bond of state.structure.bonds) {
+      this.addBond(bond, input);
+    }
+  }
+
+  private addBond(bond: Bond, input: RenderInput): void {
+    const { state } = input;
+    const { a, b } = bond;
+    if (state.hidden[a] || state.hidden[b]) {
+      return;
+    }
+    const ra = state.bondRadius[a] ?? 0;
+    const rb = state.bondRadius[b] ?? 0;
+    if (ra === 0 || rb === 0) {
+      return;
+    }
+    const line = ra === WIREFRAME_LINE || rb === WIREFRAME_LINE;
+    const radius = line ? 0 : Math.min(ra, rb);
+    const ax = this.sx[a] ?? 0;
+    const ay = this.sy[a] ?? 0;
+    const bx = this.sx[b] ?? 0;
+    const by = this.sy[b] ?? 0;
+    const dx = bx - ax;
+    const dy = by - ay;
+    const len = Math.hypot(dx, dy);
+    if (len < APPEARANCE.MIN_PROJECTED_BOND_LENGTH) {
+      return;
+    }
+    const f = this.perspectiveFactor(((this.sz[a] ?? 0) + (this.sz[b] ?? 0)) / 2);
+    const width = line ? WIRE_WIDTH : 2 * radius * this.scale * f;
+    // Start each half at the sphere surface so it does not paint over the ball's face.
+    const trimA = bondTrim(this.sr[a] ?? 0, width, len);
+    const trimB = bondTrim(this.sr[b] ?? 0, width, len);
+    const multiple = bondStrandCount(bond.order, roundSymmetric(bond.order));
+    const { strandWidth, spacing } = bondStrandLayout(width, multiple, line);
+    this.addBondStrands(bond, a, b, {
+      ax,
+      ay,
+      bx,
+      by,
+      dx,
+      dy,
+      len,
+      trimA,
+      trimB,
+      line,
+      multiple,
+      strandWidth,
+      spacing,
+      ca: state.colors[a] ?? 0,
+      cb: state.colors[b] ?? 0,
+    });
+  }
+
+  /** Pushes wire/stick strands for one bond (single colour or split mid-bond). */
+  private addBondStrands(
+    bond: Bond,
+    a: number,
+    b: number,
+    g: {
+      ax: number;
+      ay: number;
+      bx: number;
+      by: number;
+      dx: number;
+      dy: number;
+      len: number;
+      trimA: number;
+      trimB: number;
+      line: boolean;
+      multiple: number;
+      strandWidth: number;
+      spacing: number;
+      ca: number;
+      cb: number;
+    },
+  ): void {
+    const px = (-g.dy / g.len) * g.spacing;
+    const py = (g.dx / g.len) * g.spacing;
+    const kind = g.line ? Kind.LINE : Kind.CYLINDER;
+    const za = this.sz[a] ?? 0;
+    const zb = this.sz[b] ?? 0;
+    for (let s = 0; s < g.multiple; s++) {
+      const offset = s - (g.multiple - 1) / 2;
+      const ox = px * offset;
+      const oy = py * offset;
+      const x1 = g.ax + g.dx * g.trimA + ox;
+      const y1 = g.ay + g.dy * g.trimA + oy;
+      const x2 = g.bx - g.dx * g.trimB + ox;
+      const y2 = g.by - g.dy * g.trimB + oy;
+      const mx = (g.ax + g.bx) / 2 + ox;
+      const my = (g.ay + g.by) / 2 + oy;
+      // The second strand of an aromatic bond is drawn thinner, like Jmol's dashed partial bond.
+      const w = bond.order === 1.5 && s === 1 ? g.strandWidth * APPEARANCE.AROMATIC_STRAND_WIDTH_FACTOR : g.strandWidth;
+      this.pushBondStrand(kind, g.ca, g.cb, za, zb, x1, y1, x2, y2, mx, my, w);
+    }
+  }
+
+  private pushBondStrand(
+    kind: number,
+    ca: number,
+    cb: number,
+    za: number,
+    zb: number,
+    x1: number,
+    y1: number,
+    x2: number,
+    y2: number,
+    mx: number,
+    my: number,
+    w: number,
+  ): void {
+    if (ca === cb) {
+      const it = this.item(kind, (za + zb) / 2);
+      Object.assign(it, { x1, y1, x2, y2, size: w, color: ca });
+      return;
+    }
+    const h1 = this.item(kind, (3 * za + zb) / 4);
+    Object.assign(h1, { x1, y1, x2: mx, y2: my, size: w, color: ca });
+    const h2 = this.item(kind, (za + 3 * zb) / 4);
+    Object.assign(h2, { x1: mx, y1: my, x2, y2, size: w, color: cb });
+  }
+
+  private addPolymers(input: RenderInput): void {
+    for (const path of input.paths) {
+      const proj = this.projectPolymerPath(path, input);
+      this.addPolymerSegments(path, proj, input);
+      if (path.isNucleic) {
+        this.addNucleicRungs(path, proj.projected, input);
+      }
+    }
+    this.addBackboneSticks(input);
+  }
+
+  /** Screen-space samples along a polymer path (points, perspective factors, guides, normals). */
+  private projectPolymerPath(path: PolymerPath, input: RenderInput): PolymerProjection {
+    const count = path.halfWidths.length;
+    const projected = new Float64Array(3 * count);
+    const factor = new Float64Array(count);
+    const nz = new Float64Array(count);
+    const gx = new Float64Array(count);
+    const gy = new Float64Array(count);
+    const v: Vec3 = [0, 0, 0];
+    for (let s = 0; s < count; s++) {
+      input.rotation.apply(
+        (path.points[3 * s] ?? 0) - input.center[0],
+        (path.points[3 * s + 1] ?? 0) - input.center[1],
+        (path.points[3 * s + 2] ?? 0) - input.center[2],
+        v,
+      );
+      const f = this.perspectiveFactor(v[2]);
+      factor[s] = f;
+      projected[3 * s] = this.cx + v[0] * this.scale * f;
+      projected[3 * s + 1] = this.cy - v[1] * this.scale * f;
+      projected[3 * s + 2] = v[2];
+      input.rotation.apply(path.guides[3 * s] ?? 0, path.guides[3 * s + 1] ?? 0, path.guides[3 * s + 2] ?? 0, v);
+      gx[s] = v[0];
+      gy[s] = -v[1];
+      input.rotation.apply(path.normals[3 * s] ?? 0, path.normals[3 * s + 1] ?? 0, path.normals[3 * s + 2] ?? 0, v);
+      nz[s] = v[2];
+    }
+    return { projected, factor, nz, gx, gy };
+  }
+
+  /** Cartoon ribbons (QUAD) or thin tubes (TUBE) between consecutive path samples. */
+  private addPolymerSegments(path: PolymerPath, proj: PolymerProjection, input: RenderInput): void {
+    const count = path.halfWidths.length;
+    for (let s = 0; s + 1 < count; s++) {
+      this.addOnePolymerSegment(path, proj, input, s);
+    }
+  }
+
+  private addOnePolymerSegment(path: PolymerPath, proj: PolymerProjection, input: RenderInput, s: number): void {
+    const { state } = input;
+    const residue = state.structure.residues[path.residues[s] ?? 0];
+    const lead = residue?.leadAtom ?? -1;
+    if (lead < 0 || state.hidden[lead]) {
+      return;
+    }
+    const cartoon = state.cartoon[lead] === 1;
+    const trace = state.trace[lead] === 1;
+    if (!(cartoon || trace)) {
+      return;
+    }
+    const { projected, factor, nz, gx, gy } = proj;
+    const color = state.colors[lead] ?? StereochemistryColors.moleculeFallbackColorProperty.value.toNumber();
+    const x1 = projected[3 * s] ?? 0;
+    const y1 = projected[3 * s + 1] ?? 0;
+    const x2 = projected[3 * s + 3] ?? 0;
+    const y2 = projected[3 * s + 4] ?? 0;
+    const z = ((projected[3 * s + 2] ?? 0) + (projected[3 * s + 5] ?? 0)) / 2;
+    const w1 = cartoon ? (path.halfWidths[s] ?? 0) : 0;
+    const w2 = cartoon ? (path.halfWidths[s + 1] ?? 0) : 0;
+    if (w1 > 0 || w2 > 0) {
+      this.pushCartoonQuad(x1, y1, x2, y2, z, color, w1, w2, s, factor, gx, gy, nz);
+      return;
+    }
+    this.pushTraceTube(x1, y1, x2, y2, z, color, factor[s] ?? 1);
+  }
+
+  private pushCartoonQuad(
+    x1: number,
+    y1: number,
+    x2: number,
+    y2: number,
+    z: number,
+    color: number,
+    w1: number,
+    w2: number,
+    s: number,
+    factor: Float64Array,
+    gx: Float64Array,
+    gy: Float64Array,
+    nz: Float64Array,
+  ): void {
+    const k1 = Math.max(w1, TUBE_RADIUS) * this.scale * (factor[s] ?? 1);
+    const k2 = Math.max(w2, TUBE_RADIUS) * this.scale * (factor[s + 1] ?? 1);
+    const it = this.item(Kind.QUAD, z);
+    it.x1 = x1 + (gx[s] ?? 0) * k1;
+    it.y1 = y1 + (gy[s] ?? 0) * k1;
+    it.x2 = x2 + (gx[s + 1] ?? 0) * k2;
+    it.y2 = y2 + (gy[s + 1] ?? 0) * k2;
+    it.x3 = x2 - (gx[s + 1] ?? 0) * k2;
+    it.y3 = y2 - (gy[s + 1] ?? 0) * k2;
+    it.x4 = x1 - (gx[s] ?? 0) * k1;
+    it.y4 = y1 - (gy[s] ?? 0) * k1;
+    it.color = color;
+    it.shade =
+      APPEARANCE.RIBBON_AMBIENT_LIGHT +
+      (1 - APPEARANCE.RIBBON_AMBIENT_LIGHT) * Math.abs(((nz[s] ?? 0) + (nz[s + 1] ?? 0)) / 2);
+  }
+
+  private pushTraceTube(x1: number, y1: number, x2: number, y2: number, z: number, color: number, f: number): void {
+    const it = this.item(Kind.TUBE, z);
+    Object.assign(it, { x1, y1, x2, y2, size: 2 * TUBE_RADIUS * this.scale * f, color });
+  }
+
+  /** Base "ladder rungs" from the backbone to N1 (purines) or N3 (pyrimidines), as in Jmol cartoons. */
+  private addNucleicRungs(path: PolymerPath, projected: Float64Array, input: RenderInput): void {
+    const { state } = input;
+    const structure = state.structure;
+    let last = -1;
+    for (let s = 0; s < path.residues.length; s++) {
+      const r = path.residues[s] ?? -1;
+      if (r === last || s % 6 !== 0) {
+        continue;
+      }
+      last = r;
+      const residue = structure.residues[r];
+      if (!residue || residue.leadAtom < 0 || !state.cartoon[residue.leadAtom] || state.hidden[residue.leadAtom]) {
+        continue;
+      }
+      const target = findNucleicRungTarget(residue, structure);
+      if (target < 0) {
+        continue;
+      }
+      const x1 = projected[3 * s] ?? 0;
+      const y1 = projected[3 * s + 1] ?? 0;
+      const it = this.item(Kind.TUBE, ((projected[3 * s + 2] ?? 0) + (this.sz[target] ?? 0)) / 2);
+      Object.assign(it, {
+        x1,
+        y1,
+        x2: this.sx[target] ?? 0,
+        y2: this.sy[target] ?? 0,
+        size: MOLECULE_RENDERER_SETTINGS.ADD_NUCLEIC_RUNGS_SIZE_FACTOR * TUBE_RADIUS * this.scale,
+        color: state.colors[residue.leadAtom] ?? StereochemistryColors.moleculeFallbackColorProperty.value.toNumber(),
+      });
+    }
+  }
+
+  /** Jmol `backbone`: straight sticks between consecutive lead atoms. */
+  private addBackboneSticks(input: RenderInput): void {
+    const { state } = input;
+    const residues = state.structure.residues;
+    for (let r = 1; r < residues.length; r++) {
+      const prev = residues[r - 1];
+      const cur = residues[r];
+      if (
+        !(prev && cur) ||
+        prev.leadAtom < 0 ||
+        cur.leadAtom < 0 ||
+        prev.chain !== cur.chain ||
+        cur.kind !== prev.kind
+      ) {
+        continue;
+      }
+      if (cur.kind !== ResidueKind.AMINO && cur.kind !== ResidueKind.NUCLEIC) {
+        continue;
+      }
+      const a = prev.leadAtom;
+      const b = cur.leadAtom;
+      if (!(state.backbone[a] && state.backbone[b]) || state.hidden[a] || state.hidden[b]) {
+        continue;
+      }
+      const gap = Math.hypot((this.sx[a] ?? 0) - (this.sx[b] ?? 0), (this.sy[a] ?? 0) - (this.sy[b] ?? 0));
+      if (gap > APPEARANCE.MAX_BACKBONE_GAP * this.scale) {
+        continue;
+      }
+      const z = ((this.sz[a] ?? 0) + (this.sz[b] ?? 0)) / 2;
+      const it = this.item(Kind.TUBE, z);
+      Object.assign(it, {
+        x1: this.sx[a] ?? 0,
+        y1: this.sy[a] ?? 0,
+        x2: this.sx[b] ?? 0,
+        y2: this.sy[b] ?? 0,
+        size: 2 * TUBE_RADIUS * this.scale,
+        color: state.colors[a] ?? StereochemistryColors.moleculeFallbackColorProperty.value.toNumber(),
+      });
+    }
+  }
+
+  private addHydrogenBonds(bonds: readonly Bond[], state: DisplayState): void {
+    for (const { a, b } of bonds) {
+      if (!(state.isDisplayed(a) && state.isDisplayed(b))) {
+        continue;
+      }
+      const it = this.item(Kind.DASH, ((this.sz[a] ?? 0) + (this.sz[b] ?? 0)) / 2);
+      Object.assign(it, { x1: this.sx[a] ?? 0, y1: this.sy[a] ?? 0, x2: this.sx[b] ?? 0, y2: this.sy[b] ?? 0 });
+    }
+  }
+
+  private addPolyhedra(polyhedra: readonly Polyhedron[], input: RenderInput): void {
+    const { state, positions, rotation } = input;
+    const v1: Vec3 = [0, 0, 0];
+    for (const polyhedron of polyhedra) {
+      if (state.hidden[polyhedron.center]) {
+        continue;
+      }
+      const color =
+        state.colors[polyhedron.center] ?? StereochemistryColors.moleculeFallbackColorProperty.value.toNumber();
+      for (const face of polyhedron.faces) {
+        this.pushPolyhedronFace(face, color, positions, rotation, v1);
+      }
+    }
+  }
+
+  private pushPolyhedronFace(
+    face: readonly [number, number, number],
+    color: number,
+    positions: Float64Array,
+    rotation: Rotation3,
+    scratch: Vec3,
+  ): void {
+    const [a, b, c] = face;
+    const it = this.item(Kind.FACE, ((this.sz[a] ?? 0) + (this.sz[b] ?? 0) + (this.sz[c] ?? 0)) / 3);
+    Object.assign(it, {
+      x1: this.sx[a] ?? 0,
+      y1: this.sy[a] ?? 0,
+      x2: this.sx[b] ?? 0,
+      y2: this.sy[b] ?? 0,
+      x3: this.sx[c] ?? 0,
+      y3: this.sy[c] ?? 0,
+      color,
+    });
+    it.shade = faceShade(a, b, c, positions, rotation, scratch);
+  }
+
+  // ── Painting ─────────────────────────────────────────────────────────────────
+
+  private paintItems(ctx: CanvasRenderingContext2D): void {
+    const count = this.itemCount;
+    if (this.order.length !== count) {
+      this.order = Array.from({ length: count }, (_, i) => i);
+    } else {
+      for (let i = 0; i < count; i++) {
+        this.order[i] = i;
+      }
+    }
+    const items = this.items;
+    this.order.sort((p, q) => (items[p]?.z ?? 0) - (items[q]?.z ?? 0));
+    ctx.lineJoin = "round";
+    for (const index of this.order) {
+      const it = items[index];
+      if (!it) {
+        continue;
+      }
+      switch (it.kind) {
+        case Kind.SPHERE:
+          if (it.size === 0) {
+            ctx.fillStyle = this.css(it.color);
+            const size = APPEARANCE.DOT_SIZE;
+            ctx.fillRect(it.x1 - size / 2, it.y1 - size / 2, size, size);
+          } else {
+            ctx.drawImage(this.sprite(it.color), it.x1 - it.size, it.y1 - it.size, 2 * it.size, 2 * it.size);
+          }
+          break;
+        case Kind.CYLINDER:
+          this.paintCylinder(ctx, it, "butt");
+          break;
+        case Kind.TUBE:
+          this.paintCylinder(ctx, it, "round");
+          break;
+        case Kind.LINE:
+          ctx.lineCap = "round";
+          ctx.lineWidth = it.size;
+          ctx.strokeStyle = this.css(it.color);
+          ctx.beginPath();
+          ctx.moveTo(it.x1, it.y1);
+          ctx.lineTo(it.x2, it.y2);
+          ctx.stroke();
+          break;
+        case Kind.QUAD: {
+          const fill = this.css(shadeColor(it.color, it.shade));
+          ctx.fillStyle = fill;
+          ctx.strokeStyle = fill;
+          ctx.lineWidth = APPEARANCE.POLYGON_OUTLINE_WIDTH;
+          ctx.beginPath();
+          ctx.moveTo(it.x1, it.y1);
+          ctx.lineTo(it.x2, it.y2);
+          ctx.lineTo(it.x3, it.y3);
+          ctx.lineTo(it.x4, it.y4);
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+          break;
+        }
+        case Kind.FACE:
+          ctx.globalAlpha = APPEARANCE.FACE_FILL_OPACITY;
+          ctx.fillStyle = this.css(shadeColor(it.color, it.shade));
+          ctx.beginPath();
+          ctx.moveTo(it.x1, it.y1);
+          ctx.lineTo(it.x2, it.y2);
+          ctx.lineTo(it.x3, it.y3);
+          ctx.closePath();
+          ctx.fill();
+          ctx.globalAlpha = APPEARANCE.FACE_STROKE_OPACITY;
+          ctx.strokeStyle = this.css(shadeColor(it.color, APPEARANCE.FACE_STROKE_SHADE));
+          ctx.lineWidth = APPEARANCE.POLYGON_OUTLINE_WIDTH;
+          ctx.stroke();
+          ctx.globalAlpha = 1;
+          break;
+        case Kind.DASH:
+          ctx.save();
+          ctx.setLineDash([...APPEARANCE.HYDROGEN_BOND_DASH]);
+          ctx.lineWidth = MOLECULE_RENDERER_SETTINGS.LINE_WIDTH;
+          ctx.strokeStyle = this.input?.colors.hydrogenBond ?? "";
+          ctx.beginPath();
+          ctx.moveTo(it.x1, it.y1);
+          ctx.lineTo(it.x2, it.y2);
+          ctx.stroke();
+          ctx.restore();
+          break;
+        default:
+          break;
+      }
+    }
+  }
+
+  /** Three concentric strokes fake a lit cylinder: dark rim, body, highlight. */
+  private paintCylinder(ctx: CanvasRenderingContext2D, it: Item, cap: CanvasLineCap): void {
+    // Tube segments are short and overlap; round caps there would bead the tube.
+    ctx.lineCap = it.kind === Kind.TUBE && it.size > APPEARANCE.MAX_ROUND_TUBE_WIDTH ? "butt" : cap;
+    ctx.beginPath();
+    ctx.moveTo(it.x1, it.y1);
+    ctx.lineTo(it.x2, it.y2);
+    ctx.lineWidth = it.size;
+    ctx.strokeStyle = this.css(shadeColor(it.color, APPEARANCE.CYLINDER_RIM_SHADE));
+    ctx.stroke();
+    if (it.size < APPEARANCE.MIN_CYLINDER_BODY_WIDTH) {
+      return;
+    }
+    ctx.lineCap = "butt";
+    ctx.lineWidth = it.size * MOLECULE_RENDERER_SETTINGS.PAINT_CYLINDER_LINE_WIDTH_FACTOR;
+    ctx.strokeStyle = this.css(it.color);
+    ctx.stroke();
+    if (it.size < APPEARANCE.MIN_CYLINDER_HIGHLIGHT_WIDTH) {
+      return;
+    }
+    const dx = it.x2 - it.x1;
+    const dy = it.y2 - it.y1;
+    const len = Math.hypot(dx, dy) || 1;
+    // Offset the highlight toward the upper-left light.
+    let ox = (-dy / len) * it.size * APPEARANCE.CYLINDER_HIGHLIGHT_OFFSET_FACTOR;
+    let oy = (dx / len) * it.size * APPEARANCE.CYLINDER_HIGHLIGHT_OFFSET_FACTOR;
+    if (ox + oy > 0) {
+      ox = -ox;
+      oy = -oy;
+    }
+    ctx.beginPath();
+    ctx.moveTo(it.x1 + ox, it.y1 + oy);
+    ctx.lineTo(it.x2 + ox, it.y2 + oy);
+    ctx.lineWidth = it.size * APPEARANCE.CYLINDER_HIGHLIGHT_WIDTH_FACTOR;
+    ctx.strokeStyle = this.css(lighten(it.color, APPEARANCE.CYLINDER_HIGHLIGHT_LIGHTEN));
+    ctx.stroke();
+  }
+
+  private paintUnitCell(ctx: CanvasRenderingContext2D, cell: UnitCell, input: RenderInput): void {
+    const corners = cell.corners(input.cellRange).map((p) => this.projectPoint(p, input));
+    ctx.save();
+    ctx.lineWidth = MOLECULE_RENDERER_SETTINGS.LINE_WIDTH;
+    ctx.strokeStyle = input.colors.unitCell;
+    ctx.beginPath();
+    for (const [i, j] of CELL_EDGES) {
+      const a = corners[i];
+      const b = corners[j];
+      if (a && b) {
+        ctx.moveTo(a[0], a[1]);
+        ctx.lineTo(b[0], b[1]);
+      }
+    }
+    ctx.stroke();
+    // Label the origin and the a, b, c axis ends of the first cell.
+    const unit = cell.corners([1, 1, 1]).map((p) => this.projectPoint(p, input));
+    ctx.fillStyle = input.colors.unitCell;
+    ctx.font = input.font;
+    const [o, a, b, c] = [unit[0], unit[1], unit[2], unit[4]];
+    const labels = input.cellLabels;
+    [o, a, b, c].forEach((p, k) => {
+      if (p) {
+        ctx.fillText(labels[k] ?? "", p[0] + APPEARANCE.CELL_LABEL_OFFSET, p[1] - APPEARANCE.CELL_LABEL_OFFSET);
+      }
+    });
+    ctx.restore();
+  }
+
+  private paintOverlays(ctx: CanvasRenderingContext2D, input: RenderInput): void {
+    ctx.save();
+    this.paintHalos(ctx, input);
+    this.paintAtomLabels(ctx, input);
+    this.paintMeasurements(ctx, input);
+    ctx.restore();
+  }
+
+  private paintHalos(ctx: CanvasRenderingContext2D, input: RenderInput): void {
+    const { state, colors } = input;
+    const n = state.atomCount;
+    if (input.showHalos) {
+      ctx.strokeStyle = colors.halo;
+      ctx.lineWidth = MOLECULE_RENDERER_SETTINGS.PAINT_OVERLAYS_LINE_WIDTH;
+      for (let i = 0; i < n; i++) {
+        if (state.selected[i] && this.pickable[i]) {
+          this.ring(ctx, i, APPEARANCE.HALO_PADDING);
+        }
+      }
+    }
+    ctx.lineWidth = APPEARANCE.PICK_RING_WIDTH;
+    ctx.strokeStyle = colors.pick;
+    for (const i of input.pendingPicks) {
+      this.ring(ctx, i, APPEARANCE.PICK_RING_PADDING);
+    }
+    if (input.picked !== null) {
+      this.ring(ctx, input.picked, APPEARANCE.PICK_RING_PADDING);
+    }
+    if (input.hovered !== null) {
+      ctx.strokeStyle = colors.hover;
+      ctx.setLineDash([...APPEARANCE.HOVER_RING_DASH]);
+      this.ring(ctx, input.hovered, APPEARANCE.HOVER_RING_PADDING);
+      ctx.setLineDash([]);
+    }
+  }
+
+  /** Labels sit to the upper right of their atom. */
+  private paintAtomLabels(ctx: CanvasRenderingContext2D, input: RenderInput): void {
+    const { state, colors } = input;
+    ctx.font = input.font;
+    ctx.fillStyle = colors.label;
+    ctx.textBaseline = "bottom";
+    for (let i = 0; i < state.atomCount; i++) {
+      const label = state.labels[i];
+      if (label && !state.hidden[i]) {
+        const r = Math.max(this.sr[i] ?? 0, APPEARANCE.LABEL_ANCHOR_MIN_RADIUS) * APPEARANCE.LABEL_ANCHOR_RADIUS_FACTOR;
+        ctx.fillText(
+          label,
+          (this.sx[i] ?? 0) + r + APPEARANCE.LABEL_PADDING,
+          (this.sy[i] ?? 0) - r - APPEARANCE.LABEL_PADDING,
+        );
+      }
+    }
+  }
+
+  /** Measurements: dashed polyline through the atoms, value at the middle. */
+  private paintMeasurements(ctx: CanvasRenderingContext2D, input: RenderInput): void {
+    const { colors } = input;
+    ctx.strokeStyle = colors.measurement;
+    ctx.fillStyle = colors.measurement;
+    ctx.lineWidth = MOLECULE_RENDERER_SETTINGS.LINE_WIDTH;
+    ctx.textBaseline = "middle";
+    for (const measurement of input.measurements) {
+      this.paintOneMeasurement(ctx, measurement, input);
+    }
+  }
+
+  private paintOneMeasurement(ctx: CanvasRenderingContext2D, measurement: Measurement, input: RenderInput): void {
+    const pts = measurement.atoms.map((i) => [this.sx[i] ?? 0, this.sy[i] ?? 0] as const);
+    ctx.setLineDash([...APPEARANCE.MEASUREMENT_DASH]);
+    ctx.beginPath();
+    for (const [k, [x, y]] of pts.entries()) {
+      if (k === 0) {
+        ctx.moveTo(x, y);
+      } else {
+        ctx.lineTo(x, y);
+      }
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+    const mid = measurementLabelPoint(pts);
+    ctx.fillText(
+      input.measurementLabel(measurement),
+      mid[0] + APPEARANCE.MEASUREMENT_LABEL_OFFSET_X,
+      mid[1] + APPEARANCE.MEASUREMENT_LABEL_OFFSET_Y,
+    );
+  }
+
+  private ring(ctx: CanvasRenderingContext2D, i: number, pad: number): void {
+    if (i < 0 || i >= this.sx.length) {
+      return;
+    }
+    ctx.beginPath();
+    ctx.arc(this.sx[i] ?? 0, this.sy[i] ?? 0, Math.max(this.sr[i] ?? 0, 4) + pad, 0, 2 * Math.PI);
+    ctx.stroke();
+  }
+
+  /** A small x/y/z orientation gizmo in the lower-left corner. */
+  private paintAxes(ctx: CanvasRenderingContext2D, input: RenderInput): void {
+    const size = Math.min(input.width, input.height) * APPEARANCE.AXIS_SIZE_FACTOR;
+    const ox = size * APPEARANCE.AXIS_ORIGIN_FACTOR;
+    const oy = input.height - size * APPEARANCE.AXIS_ORIGIN_FACTOR;
+    const axes: [Vec3, string, string][] = [
+      [[1, 0, 0], input.colors.axisX, input.axisLabels[0]],
+      [[0, 1, 0], input.colors.axisY, input.axisLabels[1]],
+      [[0, 0, 1], input.colors.axisZ, input.axisLabels[2]],
+    ];
+    const v: Vec3 = [0, 0, 0];
+    const projected = axes.map(([axis, color, label]) => {
+      input.rotation.apply(axis[0], axis[1], axis[2], v);
+      return { x: ox + v[0] * size, y: oy - v[1] * size, z: v[2], color, label };
+    });
+    projected.sort((p, q) => p.z - q.z);
+    ctx.save();
+    ctx.lineWidth = MOLECULE_RENDERER_SETTINGS.PAINT_AXES_LINE_WIDTH;
+    ctx.lineCap = "round";
+    ctx.font = input.font;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    for (const p of projected) {
+      ctx.strokeStyle = p.color;
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.moveTo(ox, oy);
+      ctx.lineTo(p.x, p.y);
+      ctx.stroke();
+      ctx.fillText(
+        p.label,
+        ox + (p.x - ox) * APPEARANCE.AXIS_LABEL_FACTOR,
+        oy + (p.y - oy) * APPEARANCE.AXIS_LABEL_FACTOR,
+      );
+    }
+    ctx.restore();
+  }
+
+  // ── Colour helpers ───────────────────────────────────────────────────────────
+
+  private css(color: number): string {
+    let s = this.cssCache.get(color);
+    if (!s) {
+      s = `#${color.toString(16).padStart(6, "0")}`;
+      this.cssCache.set(color, s);
+    }
+    return s;
+  }
+
+  /** A pre-shaded sphere for one colour: radial gradient with a specular highlight. */
+  private sprite(color: number): HTMLCanvasElement {
+    const cached = this.sprites.get(color);
+    if (cached) {
+      return cached;
+    }
+    if (this.sprites.size >= MAX_SPRITES) {
+      this.sprites.clear();
+    }
+    const canvas = document.createElement("canvas");
+    canvas.width = SPRITE_SIZE;
+    canvas.height = SPRITE_SIZE;
+    const c = canvas.getContext("2d");
+    if (c) {
+      const r = SPRITE_SIZE / 2;
+      const g = c.createRadialGradient(
+        r * APPEARANCE.SPHERE_LIGHT_X_FACTOR,
+        r * APPEARANCE.SPHERE_LIGHT_Y_FACTOR,
+        r * APPEARANCE.SPHERE_LIGHT_RADIUS_FACTOR,
+        r,
+        r,
+        r,
+      );
+      g.addColorStop(0, this.css(lighten(color, APPEARANCE.SPHERE_HIGHLIGHT_LIGHTEN)));
+      g.addColorStop(APPEARANCE.SPHERE_MIDTONE_STOP, this.css(lighten(color, APPEARANCE.SPHERE_MIDTONE_LIGHTEN)));
+      g.addColorStop(APPEARANCE.SPHERE_BASE_STOP, this.css(color));
+      g.addColorStop(1, this.css(shadeColor(color, APPEARANCE.SPHERE_EDGE_SHADE)));
+      c.fillStyle = g;
+      c.beginPath();
+      c.arc(r, r, r - APPEARANCE.SPHERE_SPRITE_PADDING, 0, 2 * Math.PI);
+      c.fill();
+    }
+    this.sprites.set(color, canvas);
+    return canvas;
+  }
+}
+
+/** Scales a colour's brightness (0 = black, 1 = unchanged). */
+function shadeColor(color: number, factor: number): number {
+  const r = roundSymmetric(((color >> 16) & 255) * factor);
+  const g = roundSymmetric(((color >> 8) & 255) * factor);
+  const b = roundSymmetric((color & 255) * factor);
+  return (Math.min(255, r) << 16) | (Math.min(255, g) << 8) | Math.min(255, b);
+}
+
+/** Blends a colour toward white. */
+function lighten(color: number, amount: number): number {
+  const r = (color >> 16) & 255;
+  const g = (color >> 8) & 255;
+  const b = color & 255;
+  return (
+    (roundSymmetric(r + (255 - r) * amount) << 16) |
+    (roundSymmetric(g + (255 - g) * amount) << 8) |
+    roundSymmetric(b + (255 - b) * amount)
+  );
+}
+
+/** Double/triple/aromatic strand count for a bond order. */
+function bondStrandCount(order: number, rounded: number): number {
+  if (order === 1.5) {
+    return 2;
+  }
+  return rounded >= 2 ? rounded : 1;
+}
+
+/** Fraction of bond length to skip so a stick starts at the atom sphere surface. */
+function bondTrim(sphereRadius: number, width: number, len: number): number {
+  return Math.min(
+    APPEARANCE.MAX_BOND_TRIM_FRACTION,
+    Math.sqrt(Math.max(0, sphereRadius ** 2 - (width / 2) ** 2)) / len,
+  );
+}
+
+/** Per-strand width and lateral spacing for multi-order bonds. */
+function bondStrandLayout(width: number, multiple: number, line: boolean): { strandWidth: number; spacing: number } {
+  if (multiple <= 1) {
+    return { strandWidth: width, spacing: 0 };
+  }
+  const strandWidth = width / (line ? 1 : multiple * APPEARANCE.MULTIPLE_STRAND_WIDTH_FACTOR);
+  return {
+    strandWidth,
+    spacing: Math.max(
+      strandWidth * APPEARANCE.MULTIPLE_STRAND_SPACING_FACTOR,
+      line ? APPEARANCE.MIN_WIRE_STRAND_SPACING : 0,
+    ),
+  };
+}
+
+/** N1 (purines) or N3 (pyrimidines) index for a nucleic rung, or -1. */
+function findNucleicRungTarget(residue: Residue, structure: Structure): number {
+  const purine = /G|A|I/.test(residue.name.toUpperCase());
+  const name = purine ? "N1" : "N3";
+  let target = -1;
+  for (let i = residue.firstAtom; i < residue.endAtom; i++) {
+    if (structure.atoms[i]?.name === name) {
+      target = i;
+    }
+  }
+  return target;
+}
+
+/** Lambert shade for a triangular face from model-space positions. */
+function faceShade(
+  a: number,
+  b: number,
+  c: number,
+  positions: Float64Array,
+  rotation: Rotation3,
+  scratch: Vec3,
+): number {
+  const u: Vec3 = [
+    (positions[3 * b] ?? 0) - (positions[3 * a] ?? 0),
+    (positions[3 * b + 1] ?? 0) - (positions[3 * a + 1] ?? 0),
+    (positions[3 * b + 2] ?? 0) - (positions[3 * a + 2] ?? 0),
+  ];
+  const w: Vec3 = [
+    (positions[3 * c] ?? 0) - (positions[3 * a] ?? 0),
+    (positions[3 * c + 1] ?? 0) - (positions[3 * a + 1] ?? 0),
+    (positions[3 * c + 2] ?? 0) - (positions[3 * a + 2] ?? 0),
+  ];
+  const n: Vec3 = [u[1] * w[2] - u[2] * w[1], u[2] * w[0] - u[0] * w[2], u[0] * w[1] - u[1] * w[0]];
+  const len = Math.hypot(...n) || 1;
+  rotation.apply(n[0] / len, n[1] / len, n[2] / len, scratch);
+  return APPEARANCE.POLYHEDRON_AMBIENT_LIGHT + (1 - APPEARANCE.POLYHEDRON_AMBIENT_LIGHT) * Math.abs(scratch[2]);
+}
+
+/** Screen point for a measurement value label (mid-edge, vertex, or mid of middle edge). */
+function measurementLabelPoint(pts: readonly (readonly [number, number])[]): [number, number] {
+  if (pts.length === 2) {
+    return [((pts[0]?.[0] ?? 0) + (pts[1]?.[0] ?? 0)) / 2, ((pts[0]?.[1] ?? 0) + (pts[1]?.[1] ?? 0)) / 2];
+  }
+  if (pts.length === 3) {
+    return [pts[1]?.[0] ?? 0, pts[1]?.[1] ?? 0];
+  }
+  return [((pts[1]?.[0] ?? 0) + (pts[2]?.[0] ?? 0)) / 2, ((pts[1]?.[1] ?? 0) + (pts[2]?.[1] ?? 0)) / 2];
+}
