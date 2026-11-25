@@ -1,0 +1,87 @@
+{
+  "name": "scenerystack-template",
+  "version": "0.0.0",
+  "private": true,
+  "description": "GitHub template for OpenLyceum SceneryStack sims (rename + scaffold-screens for one or N screens).",
+  "keywords": [
+    "template",
+    "simulation",
+    "SceneryStack",
+    "interactive",
+    "physics",
+    "education",
+    "pwa"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/OpenLyceum/SceneryStackTemplate.git"
+  },
+  "license": "AGPL-3.0-or-later",
+  "type": "module",
+  "scripts": {
+    "build": "tsc && vite build",
+    "build:single": "tsc && vite build --mode single",
+    "check": "tsc --noEmit && tsc -p tsconfig.scripts.json --noEmit && tsc -p tsconfig.test.json --noEmit",
+    "check:architecture": "depcruise --config .dependency-cruiser.cjs src",
+    "check:unused": "knip",
+    "clean": "rm -rf dist",
+    "dev": "vite",
+    "fix": "biome check --write .",
+    "format": "biome format --write .",
+    "icons": "node scripts/generate-icons.ts",
+    "knip": "knip",
+    "lint": "biome check --error-on-warnings .",
+    "prepare": "test \"$(git rev-parse --show-toplevel 2>/dev/null)\" = \"$PWD\" && git config core.hooksPath .githooks || true",
+    "preview": "vite preview",
+    "release": "npm run check && npm run lint && npm run check:architecture && npm run build && npm test && npm version patch && git push && git push --tags",
+    "rename": "node scripts/rename-sim.ts",
+    "scaffold-screens": "node scripts/scaffold-screens.ts",
+    "start": "vite",
+    "test": "vitest run",
+    "test:architecture": "node --test tests/*.node-test.ts",
+    "test:fuzz": "node scripts/test-fuzz.ts",
+    "test:fuzz:long": "node scripts/test-fuzz.ts 300",
+    "test:fuzz:quick": "node scripts/test-fuzz.ts 10",
+    "test:soak": "npm run test:soak:headless && npm run test:soak:browser",
+    "test:soak:browser": "npx playwright test tests/soak/browser.spec.ts",
+    "test:soak:headless": "vitest run --config vitest.soak.config.ts",
+    "test:watch": "vitest",
+    "watch": "tsc --watch"
+  },
+  "overrides": {
+    "brace-expansion": "~5.0.12",
+    "lodash": "~4.18.1",
+    "three": "~0.125.2"
+  },
+  "dependencies": {
+    "scenerystack": "^3.0.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.6.8",
+    "@playwright/test": "^1.65.1",
+    "@swc/core": "^1.15.3",
+    "@types/node": "^26.6.6",
+    "dependency-cruiser": "^18.8.0",
+    "happy-dom": "^21.0.4",
+    "knip": "^6.46.1",
+    "png-to-ico": "^3.0.2",
+    "sharp": "^0.35.5",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.8",
+    "vite-plugin-pwa": "^2.0.0",
+    "vitest": "^5.1.1"
+  },
+  "engines": {
+    "node": ">=26"
+  },
+  "devEngines": {
+    "runtime": {
+      "name": "node",
+      "version": ">=26",
+      "onFail": "error"
+    }
+  },
+  "allowScripts": {
+    "@swc/core@1.16.22": true
+  }
+}
