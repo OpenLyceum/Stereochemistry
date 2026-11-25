@@ -1,58 +1,140 @@
-/**
- * ChallengeModel.ts
- *
- * The top-level model for the simulation screen.
- *
- * Add your simulation's state here using reactive Property objects from
- * scenerystack/axon. The view observes these properties and updates automatically.
- *
- * ── Example ──────────────────────────────────────────────────────────────────
- *   import { BooleanProperty, NumberProperty } from "scenerystack/axon";
- *
- *   public readonly isRunningProperty = new BooleanProperty(false);
- *   public readonly timeProperty = new NumberProperty(0);    // seconds
- *
- * ── Step cycle ────────────────────────────────────────────────────────────────
- * The Sim calls step(dt) on every animation frame. Advance your model state
- * in that method (e.g. integrate equations, update positions).
- *
- * ── Reset ─────────────────────────────────────────────────────────────────────
- * reset() is called when the user presses Reset All. Call .reset() on every
- * Property declared here.
- */
+/** Round progression and scoring for the five stereochemistry challenges. */
+import { BooleanProperty, NumberProperty, Property } from "scenerystack/axon";
+import { dotRandom, type Random } from "scenerystack/dot";
 import type { TModel } from "scenerystack/joist";
-import { SharedModel } from "../../common/model/SharedModel.js";
+import { CHALLENGE_SETTINGS as SETTINGS } from "../../StereochemistryConstants.js";
+import { type ChallengeProblem, generateProblems, LEVELS, type Level } from "./challengeProblems.js";
+
+export const { PROBLEMS_PER_ROUND, POINTS_PER_PROBLEM, NUMBER_OF_STARS } = SETTINGS;
+export const PERFECT_SCORE = PROBLEMS_PER_ROUND * POINTS_PER_PROBLEM;
+
+type Feedback = "retry" | "correct" | "revealed" | "chairCorrect";
+type Answer = ChallengeProblem["answer"];
 
 export class ChallengeModel implements TModel {
-  /** Shared helpers — rename SharedModel to a domain type when known. */
-  public readonly shared = new SharedModel();
+  public readonly levelProperty = new Property<Level | null>(null);
+  public readonly problemProperty = new Property<ChallengeProblem | null>(null);
+  public readonly problemNumberProperty = new NumberProperty(1);
+  public readonly scoreProperty = new NumberProperty(0);
+  public readonly bestScoreProperties = Object.values(LEVELS).map(() => new NumberProperty(0));
+  public readonly roundCompleteProperty = new BooleanProperty(false);
+  public readonly hintProperty = new BooleanProperty(false);
+  public readonly solvedProperty = new BooleanProperty(false);
+  public readonly choosingPercentProperty = new BooleanProperty(false);
+  public readonly feedbackProperty = new Property<Feedback | null>(null);
+  public readonly lastPointsProperty = new NumberProperty(0);
 
-  /**
-   * Resets all model state to initial values.
-   * Called when the user presses the Reset All button.
-   */
+  private problems: ChallengeProblem[] = [];
+  private misses = 0;
+
+  private readonly random: Random;
+
+  public constructor(random: Random = dotRandom) {
+    this.random = random;
+  }
+
+  public startLevel(level: Level): void {
+    this.problems = generateProblems(level, this.random);
+    this.roundCompleteProperty.reset();
+    this.scoreProperty.reset();
+    this.levelProperty.value = level;
+    this.loadProblem(1);
+  }
+
+  public leaveLevel(): void {
+    this.levelProperty.reset();
+    this.roundCompleteProperty.reset();
+    this.problems = [];
+    this.loadProblem(1);
+  }
+
+  public toggleHint(): void {
+    if (this.problemProperty.value && !this.solvedProperty.value) {
+      this.hintProperty.toggle();
+    }
+  }
+
+  /** For a chair problem the first correct part unlocks the population choices. */
+  public submit(answer: Answer): void {
+    const problem = this.problemProperty.value;
+    if (!problem || this.solvedProperty.value) {
+      return;
+    }
+
+    const choosingPercent = this.choosingPercentProperty.value;
+    if (problem.level === LEVELS.CHAIR && !choosingPercent && answer === problem.answer) {
+      this.choosingPercentProperty.value = true;
+      this.feedbackProperty.value = "chairCorrect";
+      return;
+    }
+    const expected = problem.level === LEVELS.CHAIR && choosingPercent ? problem.percent : problem.answer;
+    if (answer === expected) {
+      const points = POINTS_PER_PROBLEM - this.misses;
+      this.lastPointsProperty.value = points;
+      this.scoreProperty.value += points;
+      this.solvedProperty.value = true;
+      this.feedbackProperty.value = "correct";
+    } else {
+      this.misses++;
+      this.solvedProperty.value = this.misses >= POINTS_PER_PROBLEM;
+      this.feedbackProperty.value = this.solvedProperty.value ? "revealed" : "retry";
+    }
+  }
+
+  public nextProblem(): void {
+    const level = this.levelProperty.value;
+    if (!(level && this.solvedProperty.value) || this.roundCompleteProperty.value) {
+      return;
+    }
+    if (this.problemNumberProperty.value < this.problems.length) {
+      this.loadProblem(this.problemNumberProperty.value + 1);
+    } else {
+      const bestScoreProperty = this.bestScoreProperties[level - 1];
+      if (bestScoreProperty) {
+        bestScoreProperty.value = Math.max(bestScoreProperty.value, this.scoreProperty.value);
+      }
+      this.roundCompleteProperty.value = true;
+    }
+  }
+
+  private loadProblem(number: number): void {
+    this.misses = 0;
+    this.problemNumberProperty.value = number;
+    this.hintProperty.reset();
+    this.solvedProperty.reset();
+    this.choosingPercentProperty.reset();
+    this.feedbackProperty.reset();
+    this.lastPointsProperty.reset();
+    this.problemProperty.value = this.problems[number - 1] ?? null;
+  }
+
   public reset(): void {
-    this.shared.reset();
-    // TODO: call .reset() on every Property declared in this model
+    this.leaveLevel();
+    this.scoreProperty.reset();
+    for (const bestScoreProperty of this.bestScoreProperties) {
+      bestScoreProperty.reset();
+    }
   }
 
-  /**
-   * Steps the model forward by dt seconds.
-   * Called every animation frame by the Sim framework.
-   *
-   * @param _dt - elapsed time in seconds since the last frame
-   */
   public step(_dt: number): void {
-    // For play/pause, speed, and elapsed time, compose TimeModel instead of hand-rolling
-    // a clock: copy src/common/TimeModel.ts (and tests/TimeModel.test.ts) from
-    // SceneryStackTemplate unchanged — Baton's drift check requires an exact match —
-    // then hold one in a readonly `timer` field, step/reset/dispose it, and list it
-    // in tests/memory-leak.test.ts.
-    // TODO: advance simulation state here
+    // Problems progress in response to the learner's answers.
   }
 
-  /** Release owned Properties / composed models. */
   public dispose(): void {
-    // No resources yet.
+    for (const property of [
+      this.levelProperty,
+      this.problemProperty,
+      this.problemNumberProperty,
+      this.scoreProperty,
+      ...this.bestScoreProperties,
+      this.roundCompleteProperty,
+      this.hintProperty,
+      this.solvedProperty,
+      this.choosingPercentProperty,
+      this.feedbackProperty,
+      this.lastPointsProperty,
+    ]) {
+      property.dispose();
+    }
   }
 }

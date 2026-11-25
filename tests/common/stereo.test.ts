@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildMolecule, mirror, swapSubstituents } from "../../src/common/model/MoleculeBuilder.js";
+import { buildMolecule, mirror } from "../../src/common/model/MoleculeBuilder.js";
 import { positionAt } from "../../src/common/model/MoleculeGraph.js";
 import { MOLECULE_LIBRARY } from "../../src/common/model/MoleculeLibrary.js";
 import {
@@ -74,9 +74,9 @@ describe("stereochemistry", () => {
     expect(relationship(control, mirror(control))).toBe("identical");
   });
 
-  it("rebuilds a configuration after swapping two groups", () => {
+  it("builds both prescribed configurations", () => {
     const original = specFor("bromochlorofluoromethane");
-    const swapped = swapSubstituents(original, 0, 1, 2);
+    const swapped = { ...original, stereo: [{ centre: 0, label: "S" }] } as const;
     expect(descriptors(buildMolecule(swapped)).get(0)).toBe("S");
     expect(descriptors(buildMolecule(original)).get(0)).toBe("R");
   });

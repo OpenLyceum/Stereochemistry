@@ -270,7 +270,7 @@ export class CyclohexaneScreenView extends ScreenView {
         const pattern = axial ? a11y.nowAxialStringProperty.value : a11y.nowEquatorialStringProperty.value;
         return pattern.replace("{{group}}", label.value).replace("{{index}}", String(carbon + 1));
       });
-      flip.addAccessibleResponse([a11y.flippedStringProperty.value, ...descriptions].join(" "));
+      this.addAccessibleResponse([a11y.flippedStringProperty.value, ...descriptions].join(" "));
     });
 
     const diagrams = new HBox({

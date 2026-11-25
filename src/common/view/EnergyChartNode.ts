@@ -22,6 +22,7 @@ type EnergyChartOptions = {
   markerEnergyProperty?: TReadOnlyProperty<number>;
   namedPoints: readonly NamedPoint[];
   expandYRange?: boolean;
+  showMarker?: boolean;
 };
 
 function sample(curve: Vector2[], x: number): number {
@@ -68,9 +69,14 @@ export class EnergyChartNode extends Node {
       stroke: colors.curveColorProperty,
       lineWidth: SETTINGS.CHART_LINE_WIDTH,
     });
-    const marker = new Circle(SETTINGS.MARKER_RADIUS, { fill: colors.chairMarkerColorProperty });
+    const showMarker = options.showMarker ?? true;
+    const marker = new Circle(SETTINGS.MARKER_RADIUS, { fill: colors.chairMarkerColorProperty, visible: showMarker });
     const patternProperty = StringManager.getInstance().getStereoStrings().energyValueStringProperty;
-    const readout = new Text(patternProperty.value, { ...labelOptions, fill: colors.chairMarkerColorProperty });
+    const readout = new Text(patternProperty.value, {
+      ...labelOptions,
+      fill: colors.chairMarkerColorProperty,
+      visible: showMarker,
+    });
     const landmarks = options.namedPoints.map(({ x, label }) => ({
       x,
       text: new Text(label, {
@@ -91,7 +97,7 @@ export class EnergyChartNode extends Node {
       marker,
       readout,
     ];
-    super({ children, pickable: false });
+    super({ children, pickable: false, excludeInvisibleChildrenFromBounds: true });
 
     const layoutAxes = () => {
       xLabel.centerX = width / 2;

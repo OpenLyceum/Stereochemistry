@@ -6,13 +6,20 @@ Explore chirality, assign R/S configurations with CIP priorities, and relate New
 
 ## Features
 
-- English, Spanish, and French localization via `StringManager`
+- **Chirality** compares molecules with their mirror images and animates superimposition.
+- **R/S** connects a rotatable 3D molecule with a wedge–dash diagram and CIP priorities.
+- **Conformations** links Newman projections and molecular rotation to energy and populations.
+- **Cyclohexane** follows chair flips and the effects of axial and equatorial substitution.
+- **Challenge** offers five scored practice rounds with hints and keyboard-accessible feedback.
+- English, Spanish, and French localization
 - Default and projector color profiles
 - Progressive Web App (installable, offline-capable)
 - Git hooks for Biome pre-commit checks
 - Shared GitHub Actions CI via `OpenLyceum/Baton`
 
 ## Quick Start
+
+Use Node.js 26.
 
 ```bash
 npm install
@@ -28,6 +35,7 @@ npm start        # dev server → http://localhost:5173
 | `npm run build` | Type-check + production build → `dist/` |
 | `npm run preview` | Preview the production build locally |
 | `npm test` | Run Vitest unit tests (includes memory-leak suite) |
+| `npx playwright test tests/browser/keyboard.spec.ts` | Run the keyboard interaction checks |
 | `npm run test:fuzz` | Optional Playwright fuzz smoke: pointer (`?fuzz`) + keyboard (`?fuzzBoard`), with `?ea`, 30s each |
 | `npm run test:fuzz -- 90` | Same fuzz for 90 seconds (`--duration 90` or `FUZZ_DURATION=90` also work) |
 | `npm run test:fuzz:quick` | Shorter fuzz smoke (10s) |

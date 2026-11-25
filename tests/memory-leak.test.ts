@@ -9,8 +9,12 @@
  * tests below using forceGC().
  */
 
+import { Property } from "scenerystack/axon";
 import { Bounds2, Range } from "scenerystack/dot";
 import { ChallengeModel } from "../src/challenge/model/ChallengeModel.js";
+import { generateProblems, LEVELS } from "../src/challenge/model/challengeProblems.js";
+import { ChallengeProblemNode } from "../src/challenge/view/ChallengeProblemNode.js";
+import { RoundCompletedPanel } from "../src/challenge/view/RoundCompletedPanel.js";
 import { ChiralityModel } from "../src/chirality/model/ChiralityModel.js";
 import { buildCyclohexane } from "../src/common/model/Cyclohexane.js";
 import { StereoViewModel } from "../src/common/model/StereoViewModel.js";
@@ -27,6 +31,8 @@ import { describeDisposalLeaks } from "./helpers/memoryLeak.js";
 const chirality = new ChiralityModel();
 const configuration = new RSModel();
 const conformations = new ConformationsModel();
+const challenge = new ChallengeModel();
+const scoreProperty = new Property("");
 const strings = StringManager.getInstance().getStereoStrings();
 
 describeDisposalLeaks([
@@ -34,7 +40,30 @@ describeDisposalLeaks([
   { name: "RSModel", create: () => new RSModel() },
   { name: "ConformationsModel", create: () => new ConformationsModel() },
   { name: "CyclohexaneModel", create: () => new CyclohexaneModel() },
-  { name: "ChallengeModel", create: () => new ChallengeModel() },
+  {
+    name: "ChallengeModel",
+    create: () => {
+      const model = new ChallengeModel();
+      model.startLevel(LEVELS.CHAIR);
+      return model;
+    },
+  },
+  ...Object.values(LEVELS).map((level) => ({
+    name: `ChallengeProblemNode (level ${level})`,
+    create: () => {
+      const [problem] = generateProblems(level);
+      if (!problem) {
+        throw new Error("Missing challenge problem");
+      }
+      return new ChallengeProblemNode(problem, challenge, (answer) => challenge.submit(answer));
+    },
+    keepAlive: () => [challenge],
+  })),
+  {
+    name: "RoundCompletedPanel",
+    create: () => new RoundCompletedPanel(challenge.scoreProperty, scoreProperty, () => challenge.leaveLevel()),
+    keepAlive: () => [challenge, scoreProperty],
+  },
   { name: "StereoViewModel", create: () => new StereoViewModel(buildCyclohexane([], 0)) },
   {
     name: "StereoViewerNode",

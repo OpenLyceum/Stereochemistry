@@ -22,7 +22,7 @@ import { ChiralityScreenSummaryContent, chiralityReadouts } from "./ChiralityScr
 export class ChiralityScreenView extends ScreenView {
   public constructor(model: ChiralityModel, options?: ScreenViewOptions) {
     const readouts = chiralityReadouts(model);
-    super({ ...options, screenSummaryContent: new ChiralityScreenSummaryContent(readouts) });
+    super({ ...options, screenSummaryContent: new ChiralityScreenSummaryContent(model, readouts) });
 
     const manager = StringManager.getInstance();
     const strings = manager.getChiralityStrings();

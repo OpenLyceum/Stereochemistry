@@ -6,7 +6,7 @@ import { Rotation3 } from "./structure/Rotation3.js";
 
 export class StereoViewModel {
   public readonly rotationProperty: Property<Rotation3>;
-  public readonly zoomProperty = new NumberProperty(SETTINGS.DEFAULT_ZOOM);
+  public readonly zoomProperty: NumberProperty;
   public readonly hoveredAtomProperty = new Property<number | null>(null);
   public readonly pickedAtomProperty = new Property<number | null>(null);
   public readonly builtProperty: Property<BuiltMolecule>;
@@ -14,14 +14,16 @@ export class StereoViewModel {
   public readonly labelsProperty = new Property<ReadonlyMap<number, string>>(new Map());
   public readonly showTetrahedronProperty = new BooleanProperty(false);
 
-  private readonly defaultRotation: () => Rotation3;
+  private readonly defaultRotation: (built: BuiltMolecule) => Rotation3;
 
   public constructor(
     built: BuiltMolecule,
-    defaultRotation: () => Rotation3 = () => Rotation3.IDENTITY,
-    initialRotation = defaultRotation(),
+    defaultRotation: (built: BuiltMolecule) => Rotation3 = () => Rotation3.IDENTITY,
+    initialRotation = defaultRotation(built),
+    initialZoom: number = SETTINGS.DEFAULT_ZOOM,
   ) {
     this.defaultRotation = defaultRotation;
+    this.zoomProperty = new NumberProperty(initialZoom);
     this.builtProperty = new Property(built);
     this.rotationProperty = new Property(initialRotation);
   }
@@ -37,7 +39,7 @@ export class StereoViewModel {
     );
   }
 
-  public resetView(rotation = this.defaultRotation()): void {
+  public resetView(rotation = this.defaultRotation(this.builtProperty.value)): void {
     this.rotationProperty.value = rotation;
     this.zoomProperty.reset();
   }

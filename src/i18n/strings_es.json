@@ -1,15 +1,15 @@
 {
-  "title": "Stereochemistry",
+  "title": "Estereoquímica",
   "screens": {
-    "chirality": "Chirality",
+    "chirality": "Quiralidad",
     "configuration": "R/S",
-    "conformations": "Conformations",
-    "cyclohexane": "Cyclohexane",
-    "challenge": "Challenge"
+    "conformations": "Conformaciones",
+    "cyclohexane": "Ciclohexano",
+    "challenge": "Retos"
   },
   "molecules": {
     "bromochlorofluoromethane": "Bromoclorofluorometano",
-    "2-butanol": "Butan-2-ol",
+    "2-butanol": "2-butanol",
     "2-bromobutane": "2-Bromobutano",
     "lactic-acid": "Ácido láctico",
     "alanine": "Alanina",
@@ -40,8 +40,10 @@
     "chirality": {
       "screenSummary": {
         "playArea": "Una molécula giratoria y su imagen especular aparecen a ambos lados del plano del espejo.",
-        "controlArea": "Elige una molécula, marca sus centros estereogénicos, intercambia dos grupos o superpón su imagen especular.",
-        "interactionHint": "Prueba Superponer para comparar las dos estructuras. Selecciona el centro donde quieras intercambiar los grupos."
+        "controlArea": "Elige una molécula, marca sus estereocentros, intercambia dos grupos o superpón su imagen especular.",
+        "interactionHint": "Prueba Superponer para comparar las dos estructuras. Selecciona el centro donde quieras intercambiar los grupos.",
+        "originalOnly": "El área de juego muestra la molécula original en 3D.",
+        "separate": "Usa Separar para devolver la imagen especular al lado de la molécula original, o elige otra molécula."
       },
       "currentDetails": "{{molecule}}. {{count}}. {{chirality}}. {{descriptors}} {{result}}",
       "viewer": "Molécula original, visor 3D"
@@ -49,8 +51,10 @@
     "configuration": {
       "screenSummary": {
         "playArea": "Una molécula en 3D, un dibujo de cuñas y una explicación de las prioridades CIP.",
-        "controlArea": "Elige una molécula o un centro estereogénico, orienta la prioridad 4 hacia atrás y responde R o S.",
-        "interactionHint": "Orienta la prioridad 4 hacia atrás. Sigue las prioridades 1, 2 y 3 para elegir entre R y S."
+        "controlArea": "Elige una molécula o un estereocentro, orienta la prioridad 4 hacia atrás y responde R o S.",
+        "interactionHint": "Orienta la prioridad 4 hacia atrás. Sigue las prioridades 1, 2 y 3 para elegir entre R y S.",
+        "noCentrePlay": "El área de juego muestra una molécula en 3D sin estereocentros.",
+        "noCentreControls": "Elige una molécula con un estereocentro para practicar la asignación R o S."
       },
       "currentDetails": "{{molecule}}. {{centre}}. {{direction}} {{feedback}}",
       "priorityDirection": "La prioridad 4 apunta hacia atrás. El orden 1, 2, 3 sigue el {{direction}}.",
@@ -64,8 +68,11 @@
       "screenSummary": {
         "playArea": "La molécula en 3D, la proyección de Newman y la curva muestran el mismo ángulo diedro.",
         "controlArea": "Elige una molécula, cambia el ángulo, anima la rotación o ajusta la temperatura.",
-        "interactionHint": "Empieza cambiando el ángulo diedro y observa la energía."
-      }
+        "interactionHint": "Empieza cambiando el ángulo diedro y observa la energía.",
+        "withPopulations": "La molécula en 3D, la proyección de Newman y la curva de energía siguen el ángulo diedro del butano. Se comparan las poblaciones de sus tres conformaciones alternadas.",
+        "animating": "La rotación está en marcha. Desmarca Animar para detenerla o modifica el ángulo diedro y la temperatura."
+      },
+      "energyDescription": "{{value}} kilojulios por mol"
     },
     "cyclohexane": {
       "currentDetails": "{{preset}}. {{populations}}. {{relative}}.",
@@ -75,18 +82,27 @@
       "progressDescription": "{{value}} por ciento del recorrido de inversión",
       "viewerHelp": "Selecciona un carbono del anillo para editar sus sustituyentes. Usa N o P para recorrer los carbonos y Entrar o Espacio para seleccionar.",
       "screenSummary": {
-        "playArea": "Una estructura giratoria de ciclohexano y una curva de energía muestran el recorrido de la inversión del anillo.",
+        "playArea": "Conformación actual del ciclohexano: {{geometry}}. La curva de energía muestra la inversión del anillo.",
         "controlArea": "Elige un modelo, invierte el anillo o edita los grupos unidos a un carbono del anillo.",
-        "interactionHint": "Empieza invirtiendo el anillo para ver el intercambio de las posiciones axiales y ecuatoriales."
-      }
+        "interactionHint": "Empieza invirtiendo el anillo para ver el intercambio de las posiciones axiales y ecuatoriales.",
+        "flipping": "Vuelve a usar Inversión del anillo para invertir el movimiento, o mueve el control de progreso para examinar una geometría."
+      },
+      "inProgress": "geometría intermedia del anillo"
     },
     "challenge": {
       "screenSummary": {
-        "playArea": "El área de juego muestra el contenido principal de la simulación.",
-        "controlArea": "El área de control tiene un botón Restablecer todo que devuelve la simulación a su estado inicial.",
-        "interactionHint": "Explora la simulación interactuando con sus controles."
+        "playArea": "El área de juego muestra moléculas o conformaciones para comparar.",
+        "controlArea": "Elige una respuesta o pide una pista. Tras resolver el problema, pasa al siguiente.",
+        "interactionHint": "Elige uno de los cinco retos para empezar."
       },
-      "currentDetails": "La simulación está en su estado inicial."
+      "currentDetails": "{{prompt}} {{status}} {{feedback}}",
+      "projection": "{{choice}} a {{angle}} grados",
+      "markedCentre": "Estereocentro marcado: átomo {{index}}. {{controls}}",
+      "chairDetails": "{{choice}}. {{positions}}",
+      "aValue": "{{group}}: valor A de {{value}} kilojulios por mol.",
+      "energyAtAngle": "{{angle}} grados: {{energy}} kilojulios por mol.",
+      "mirrorFirst": "Imagen especular de la molécula 1",
+      "positionDescription": "Posición del grupo {{group}} en el carbono {{carbon}}: {{position}}."
     },
     "stereo": {
       "viewer": "Visor molecular 3D",
@@ -107,11 +123,16 @@
       "newmanLarge": "Cambiar el ángulo en 60 grados",
       "newmanHelp": "Usa las flechas izquierda y derecha para avanzar 5 grados. Mantén Mayús para avanzar 60 grados.",
       "viewerShortcuts": "Visor molecular",
-      "stereocentre": "{{element}} {{index}}, centro estereogénico"
+      "stereocentre": "{{element}} {{index}}, estereocentro",
+      "bromine": "Bromo",
+      "nitrogen": "Nitrógeno",
+      "fluorine": "Flúor",
+      "iodine": "Yodo"
     }
   },
   "preferences": {
-    "title": "Simulación"
+    "title": "Simulación",
+    "scope": "El idioma, el modo de proyección y el resaltado interactivo se aplican a las cinco pantallas."
   },
   "stereo": {
     "molecule": "Molécula",
@@ -179,11 +200,11 @@
     "superimpose": "Superponer",
     "separate": "Separar",
     "swap": "Intercambiar dos grupos",
-    "showStereocentres": "Mostrar centros estereogénicos",
+    "showStereocentres": "Mostrar estereocentros",
     "showMirror": "Mostrar imagen especular",
     "chiral": "Quiral",
     "achiral": "Aquiral",
-    "centreCount": "Centros estereogénicos: {{count}}",
+    "centreCount": "Estereocentros: {{count}}",
     "descriptors": "({{descriptors}})",
     "meso": "({{descriptors}}) — meso",
     "match": "Superponible — aquiral",
@@ -191,11 +212,11 @@
     "centreMark": "*"
   },
   "configuration": {
-    "nextCentre": "Siguiente centro estereogénico",
+    "nextCentre": "Siguiente estereocentro",
     "showPriorities": "Mostrar prioridades",
     "orientLowest": "Orientar la prioridad 4 hacia atrás",
-    "centre": "Centro estereogénico {{index}}",
-    "noCentre": "Esta molécula no tiene centros estereogénicos.",
+    "centre": "Estereocentro {{index}}",
+    "noCentre": "Esta molécula no tiene estereocentros.",
     "drawing": "Representación de cuñas",
     "trace": "Prioridades CIP",
     "sphere": "Esfera {{number}}: {{comparison}}",
@@ -212,5 +233,42 @@
     "correctCentre": "Correcto: el centro {{index}} es {{descriptor}}.",
     "toward": "Casi. La prioridad 4 apunta hacia ti, así que invierte el sentido.",
     "tryAway": "Casi. Orienta la prioridad 4 hacia atrás y sigue 1 → 2 → 3."
+  },
+  "challenge": {
+    "chooseLevel": "Elige un reto",
+    "chirality": "¿Quiral o aquiral?",
+    "configuration": "Asigna R o S al estereocentro marcado.",
+    "relationship": "¿Qué relación hay entre las dos moléculas?",
+    "newman": "¿Qué proyección de Newman tiene la energía más baja?",
+    "chair": "¿Qué silla es más estable?",
+    "back": "Niveles",
+    "next": "Siguiente problema",
+    "finish": "Terminar la ronda",
+    "hint": "Pista",
+    "hideHint": "Ocultar pista",
+    "mirrorHint": "Compara la disposición de los grupos con ayuda de una imagen especular.",
+    "cipHint": "Ordena los ligandos según las reglas CIP. Orienta la prioridad 4 hacia atrás y sigue 1 → 2 → 3.",
+    "energyHint": "Compara las energías en los ángulos propuestos.",
+    "chairHint": "Suma los valores A de los sustituyentes axiales de cada silla.",
+    "firstModel": "Molécula 1",
+    "secondModel": "Molécula 2",
+    "projection": "Proyección de Newman {{number}}",
+    "population": "¿Qué porcentaje corresponde a la silla favorecida a {{temperature}} K?",
+    "percent": "{{value}} %",
+    "status": "Problema {{number}} de {{total}} · {{score}}",
+    "retry": "Inténtalo de nuevo.",
+    "correct": "Respuesta correcta. Puntos obtenidos: {{points}}.",
+    "revealed": "Respuesta correcta: {{answer}}.",
+    "chairCorrect": "Silla correcta. Elige ahora su población en el equilibrio.",
+    "completed": "Ronda terminada",
+    "score": "Puntuación: {{points}} de {{total}}",
+    "levelBest": "{{level}} · Mejor puntuación: {{points}} de {{total}}",
+    "identical": "Idénticas",
+    "enantiomers": "Enantiómeros",
+    "diastereomers": "Diastereómeros",
+    "configurationLevel": "Asignar R/S",
+    "relationshipLevel": "Relaciones entre estereoisómeros",
+    "newmanLevel": "Proyección de Newman más estable",
+    "chairLevel": "Silla más estable"
   }
 }

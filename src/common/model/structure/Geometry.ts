@@ -37,7 +37,6 @@ export function distance(a: Vec3, b: Vec3): number {
 
 /**
  * Angle a–b–c at vertex b in degrees, used to verify generated bond geometry.
- * @internal
  */
 export function angle(a: Vec3, b: Vec3, c: Vec3): number {
   const u = normalize(subtract(a, b));

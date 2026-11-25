@@ -37,11 +37,25 @@ export function chiralityReadouts(model: ChiralityModel) {
 }
 
 export class ChiralityScreenSummaryContent extends ScreenSummaryContent {
-  public constructor(readouts: ReturnType<typeof chiralityReadouts>) {
+  public constructor(model: ChiralityModel, readouts: ReturnType<typeof chiralityReadouts>) {
     const a11y = StringManager.getInstance().getChiralityA11yStrings();
     super({
-      playAreaContent: a11y.screenSummary.playAreaStringProperty,
-      controlAreaContent: a11y.screenSummary.controlAreaStringProperty,
+      playAreaContent: new DerivedProperty(
+        [
+          model.showMirrorProperty,
+          a11y.screenSummary.playAreaStringProperty,
+          a11y.screenSummary.originalOnlyStringProperty,
+        ],
+        (visible, comparison, original) => (visible ? comparison : original),
+      ),
+      controlAreaContent: new DerivedProperty(
+        [
+          model.completedProperty,
+          a11y.screenSummary.controlAreaStringProperty,
+          a11y.screenSummary.separateStringProperty,
+        ],
+        (completed, controls, separate) => (completed ? separate : controls),
+      ),
       currentDetailsContent: new PatternStringProperty(a11y.currentDetailsStringProperty, {
         molecule: readouts.nameProperty,
         count: readouts.countProperty,

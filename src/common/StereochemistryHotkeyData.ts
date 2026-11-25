@@ -1,5 +1,5 @@
 import { HotkeyData, type HotkeyDataOptions } from "scenerystack/scenery";
-import { StringManager } from "./i18n/StringManager.js";
+import { StringManager } from "../i18n/StringManager.js";
 
 const strings = StringManager.getInstance().getStereoA11yStrings();
 

@@ -166,7 +166,6 @@ export function isChiral(built: BuiltMolecule): boolean {
 
 /**
  * Classify the stereoisomer relationship between molecules of the same constitution.
- * @public
  */
 export function relationship(
   a: BuiltMolecule,

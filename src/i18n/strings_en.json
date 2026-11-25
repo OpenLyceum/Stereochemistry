@@ -41,7 +41,9 @@
       "screenSummary": {
         "playArea": "A rotatable molecule and its mirror image appear on either side of a mirror plane.",
         "controlArea": "Choose a molecule, mark stereocentres, exchange two groups, or superimpose the mirror image.",
-        "interactionHint": "Try Superimpose to compare the two structures. Select a stereocentre to choose where to swap groups."
+        "interactionHint": "Try Superimpose to compare the two structures. Select a stereocentre to choose where to swap groups.",
+        "originalOnly": "The play area shows the original 3D molecule.",
+        "separate": "Use Separate to move the mirror image back beside the original, or select another molecule."
       },
       "currentDetails": "{{molecule}}. {{count}}. {{chirality}}. {{descriptors}} {{result}}",
       "viewer": "Original molecule, 3D viewer"
@@ -50,7 +52,9 @@
       "screenSummary": {
         "playArea": "A 3D molecule, a wedge–dash drawing, and an explanation of CIP priorities.",
         "controlArea": "Choose a molecule or stereocentre, orient priority 4 away, and answer R or S.",
-        "interactionHint": "Turn priority 4 away. Follow priorities 1, 2, and 3 to decide between R and S."
+        "interactionHint": "Turn priority 4 away. Follow priorities 1, 2, and 3 to decide between R and S.",
+        "noCentrePlay": "The play area shows a 3D molecule with no stereocentre.",
+        "noCentreControls": "Choose a molecule with a stereocentre to practise assigning R or S."
       },
       "currentDetails": "{{molecule}}. {{centre}}. {{direction}} {{feedback}}",
       "priorityDirection": "Priority 4 is pointing away. The order 1, 2, 3 is {{direction}}.",
@@ -64,8 +68,11 @@
       "screenSummary": {
         "playArea": "The 3D molecule, Newman projection, and curve show the same dihedral angle.",
         "controlArea": "Choose a molecule, change the angle, animate rotation, or adjust the temperature.",
-        "interactionHint": "Start by changing the dihedral angle and follow the energy."
-      }
+        "interactionHint": "Start by changing the dihedral angle and follow the energy.",
+        "withPopulations": "The 3D molecule, Newman projection and energy curve track butane’s dihedral. The population display compares its three staggered conformations.",
+        "animating": "Rotation is running. Clear Animate to stop it or change the dihedral and temperature."
+      },
+      "energyDescription": "{{value}} kilojoules per mole"
     },
     "cyclohexane": {
       "currentDetails": "{{preset}}. {{populations}}. {{relative}}.",
@@ -75,18 +82,27 @@
       "progressDescription": "{{value}} percent through the flip path",
       "viewerHelp": "Select a ring carbon to edit its substituents. Use N or P to move between carbons and Enter or Space to select.",
       "screenSummary": {
-        "playArea": "A rotatable cyclohexane structure and an energy curve show the course of a ring flip.",
+        "playArea": "Cyclohexane is currently in {{geometry}}. The energy curve shows the ring flip.",
         "controlArea": "Choose a preset, flip the ring, or edit the groups attached to a ring carbon.",
-        "interactionHint": "Start with Ring flip to see axial and equatorial positions exchange."
-      }
+        "interactionHint": "Start with Ring flip to see axial and equatorial positions exchange.",
+        "flipping": "Use Ring flip again to reverse the motion, or move the progress slider to inspect a geometry."
+      },
+      "inProgress": "an intermediate ring geometry"
     },
     "challenge": {
       "screenSummary": {
-        "playArea": "The play area shows the main simulation content.",
-        "controlArea": "The control area has a Reset All button that returns the simulation to its starting state.",
-        "interactionHint": "Explore the simulation by interacting with its controls."
+        "playArea": "The play area presents molecules or conformations to compare.",
+        "controlArea": "Select an answer or ask for a hint. After solving the problem, advance to the next one.",
+        "interactionHint": "Choose one of the five challenges to begin."
       },
-      "currentDetails": "The simulation is in its initial state."
+      "currentDetails": "{{prompt}} {{status}} {{feedback}}",
+      "projection": "{{choice}} at {{angle}} degrees",
+      "markedCentre": "Marked stereocentre: atom {{index}}. {{controls}}",
+      "chairDetails": "{{choice}}. {{positions}}",
+      "aValue": "{{group}}: A-value {{value}} kilojoules per mole.",
+      "energyAtAngle": "{{angle}} degrees: {{energy}} kilojoules per mole.",
+      "mirrorFirst": "Molecule 1 mirror image",
+      "positionDescription": "{{group}} at carbon {{carbon}} is {{position}}."
     },
     "stereo": {
       "viewer": "3D molecule viewer",
@@ -107,11 +123,16 @@
       "newmanLarge": "Change the angle by 60 degrees",
       "newmanHelp": "Use left or right arrow for 5 degrees. Hold Shift for 60 degrees.",
       "viewerShortcuts": "Molecule viewer",
-      "stereocentre": "{{element}} {{index}}, stereocentre"
+      "stereocentre": "{{element}} {{index}}, stereocentre",
+      "bromine": "Bromine",
+      "nitrogen": "Nitrogen",
+      "fluorine": "Fluorine",
+      "iodine": "Iodine"
     }
   },
   "preferences": {
-    "title": "Simulation"
+    "title": "Simulation",
+    "scope": "Language, projector mode, and interactive highlights apply to all five screens."
   },
   "stereo": {
     "molecule": "Molecule",
@@ -212,5 +233,42 @@
     "correctCentre": "Correct: stereocentre {{index}} is {{descriptor}}.",
     "toward": "Not quite — priority 4 is pointing toward you, so reverse the direction.",
     "tryAway": "Not quite — turn priority 4 away and follow 1 → 2 → 3."
+  },
+  "challenge": {
+    "chooseLevel": "Choose a challenge",
+    "chirality": "Chiral or achiral?",
+    "configuration": "Assign R or S at the marked stereocentre.",
+    "relationship": "What is the relationship between the two molecules?",
+    "newman": "Which Newman projection has the lowest energy?",
+    "chair": "Which chair is more stable?",
+    "back": "Levels",
+    "next": "Next problem",
+    "finish": "Finish round",
+    "hint": "Hint",
+    "hideHint": "Hide hint",
+    "mirrorHint": "Compare the arrangements using a mirror image.",
+    "cipHint": "Rank the ligands by the CIP rules. Turn priority 4 away, then trace 1 → 2 → 3.",
+    "energyHint": "Compare the energies at the candidate angles.",
+    "chairHint": "Add the A-values of the axial substituents in each chair.",
+    "firstModel": "Molecule 1",
+    "secondModel": "Molecule 2",
+    "projection": "Newman projection {{number}}",
+    "population": "What percentage is in the favoured chair at {{temperature}} K?",
+    "percent": "{{value}}%",
+    "status": "Problem {{number}} of {{total}} · {{score}}",
+    "retry": "Try again.",
+    "correct": "Correct. You earned {{points}} points.",
+    "revealed": "Correct answer: {{answer}}.",
+    "chairCorrect": "Correct chair. Now choose its equilibrium population.",
+    "completed": "Round complete",
+    "score": "Score: {{points}} of {{total}}",
+    "levelBest": "{{level}} · Best: {{points}} of {{total}}",
+    "identical": "Identical",
+    "enantiomers": "Enantiomers",
+    "diastereomers": "Diastereomers",
+    "configurationLevel": "Assign R/S",
+    "relationshipLevel": "Stereoisomer relationships",
+    "newmanLevel": "Most stable Newman projection",
+    "chairLevel": "More stable chair"
   }
 }

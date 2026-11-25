@@ -340,19 +340,3 @@ export function withPositions(built: BuiltMolecule, positions: Float64Array): Bu
     },
   };
 }
-
-/**
- * Swapping two distinct groups inverts a specification's prescribed configuration.
- * @public
- */
-export function swapSubstituents(spec: MoleculeSpec, centre: number, i: number, j: number): MoleculeSpec {
-  if (i === j || !spec.stereo?.some((entry) => entry.centre === centre)) {
-    return spec;
-  }
-  return {
-    ...spec,
-    stereo: spec.stereo.map((entry) =>
-      entry.centre === centre ? { ...entry, label: entry.label === "R" ? "S" : "R" } : entry,
-    ),
-  };
-}

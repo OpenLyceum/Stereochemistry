@@ -79,11 +79,21 @@ export function rsReadouts(model: RSModel) {
 }
 
 export class RSScreenSummaryContent extends ScreenSummaryContent {
-  public constructor(readouts: ReturnType<typeof rsReadouts>) {
+  public constructor(model: RSModel, readouts: ReturnType<typeof rsReadouts>) {
     const a11y = StringManager.getInstance().getRSA11yStrings();
     super({
-      playAreaContent: a11y.screenSummary.playAreaStringProperty,
-      controlAreaContent: a11y.screenSummary.controlAreaStringProperty,
+      playAreaContent: new DerivedProperty(
+        [model.cipProperty, a11y.screenSummary.playAreaStringProperty, a11y.screenSummary.noCentrePlayStringProperty],
+        (cip, full, molecule) => (cip ? full : molecule),
+      ),
+      controlAreaContent: new DerivedProperty(
+        [
+          model.cipProperty,
+          a11y.screenSummary.controlAreaStringProperty,
+          a11y.screenSummary.noCentreControlsStringProperty,
+        ],
+        (cip, full, select) => (cip ? full : select),
+      ),
       currentDetailsContent: new PatternStringProperty(a11y.currentDetailsStringProperty, {
         molecule: readouts.nameProperty,
         centre: readouts.centreTextProperty,

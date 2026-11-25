@@ -1,6 +1,7 @@
 import { Multilink, type TReadOnlyProperty } from "scenerystack/axon";
 import type { Bounds2 } from "scenerystack/dot";
 import { Vector2 } from "scenerystack/dot";
+import { StringUtils } from "scenerystack/phetcommon";
 import {
   CanvasNode,
   Color,
@@ -19,7 +20,6 @@ import {
   MOLECULE_RENDERER_APPEARANCE_SETTINGS,
   STEREO_VIEWER_SETTINGS as SETTINGS,
 } from "../../StereochemistryConstants.js";
-import { VIEWER_HOTKEYS } from "../../StereochemistryHotkeyData.js";
 import { type BuiltMolecule, positionAt } from "../model/MoleculeGraph.js";
 import { findStereocentres } from "../model/Stereocentres.js";
 import type { StereoViewModel } from "../model/StereoViewModel.js";
@@ -27,9 +27,11 @@ import { DisplayState } from "../model/structure/DisplayState.js";
 import type { Vec3 } from "../model/structure/Geometry.js";
 import type { Measurement } from "../model/structure/Measurement.js";
 import { findPolyhedra } from "../model/structure/Polyhedra.js";
+import { VIEWER_HOTKEYS } from "../StereochemistryHotkeyData.js";
 import { MoleculeRenderer } from "./MoleculeRenderer.js";
 
 type StereoViewerOptions = {
+  labelCentreProperty?: TReadOnlyProperty<number | null>;
   measurementsProperty?: TReadOnlyProperty<readonly Measurement[]>;
   measurementLabelOffsetX?: number;
   measurementLabelProperty?: TReadOnlyProperty<string>;
@@ -136,6 +138,7 @@ class StereoCanvasNode extends CanvasNode {
       hovered: model.hoveredAtomProperty.value,
       picked: model.pickedAtomProperty.value,
       pendingPicks: [],
+      labelCentre: options.labelCentreProperty?.value ?? null,
       measurements: options.measurementsProperty?.value ?? [],
       ...(options.measurementLabelOffsetX !== undefined
         ? { measurementLabelOffsetX: options.measurementLabelOffsetX }
@@ -146,6 +149,7 @@ class StereoCanvasNode extends CanvasNode {
       ...(options.bondColor ? { bondColor: options.bondColor } : {}),
       colors: {
         label: text,
+        labelOutline: StereochemistryColors.backgroundColorProperty.value.toCSS(),
         measurement: StereochemistryColors.measurementColorProperty.value.toCSS(),
         halo: StereochemistryColors.viewerHaloColorProperty.value.toCSS(),
         hover: text,
@@ -177,6 +181,11 @@ export class StereoViewerNode extends Node {
         ? {
             tagName: "div",
             ariaRole: "application",
+            accessibleNameBehavior: (_node, pdomOptions, name) => ({
+              ...pdomOptions,
+              ariaLabel: name,
+              innerContent: name,
+            }),
             focusable: true,
             accessibleName: options.accessibleName ?? a11y.viewerStringProperty,
             accessibleHelpText: options.helpText ?? a11y.viewerHelpStringProperty,
@@ -200,6 +209,7 @@ export class StereoViewerNode extends Node {
       invalidate,
     );
     const appearanceDependencies = [
+      options.labelCentreProperty,
       options.measurementsProperty,
       options.measurementLabelProperty,
       ...(options.appearanceDependencies ?? []),
@@ -244,12 +254,16 @@ export class StereoViewerNode extends Node {
         H: a11y.hydrogenStringProperty.value,
         O: a11y.oxygenStringProperty.value,
         Cl: a11y.chlorineStringProperty.value,
+        Br: a11y.bromineStringProperty.value,
+        N: a11y.nitrogenStringProperty.value,
+        F: a11y.fluorineStringProperty.value,
+        I: a11y.iodineStringProperty.value,
       };
       const name = symbol && Object.hasOwn(element, symbol) ? element[symbol as keyof typeof element] : (symbol ?? "");
       const pattern = findStereocentres(structure, positions).includes(index)
         ? a11y.stereocentreStringProperty.value
         : a11y.atomStringProperty.value;
-      this.addAccessibleResponse(pattern.replace("{{element}}", name).replace("{{index}}", String(index + 1)));
+      this.addAccessibleResponse(StringUtils.fillIn(pattern, { element: name, index: String(index + 1) }));
     };
     let atomCursor: number | null = null;
     const clearCursor = (atom: number | null) => {

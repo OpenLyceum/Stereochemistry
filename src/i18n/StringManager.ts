@@ -105,6 +105,10 @@ export class StringManager {
     return stringProperties.chirality;
   }
 
+  public getChallengeStrings() {
+    return stringProperties.challenge;
+  }
+
   public getRSStrings() {
     return stringProperties.configuration;
   }

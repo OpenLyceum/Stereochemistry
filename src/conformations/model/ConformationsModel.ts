@@ -123,6 +123,7 @@ export class ConformationsModel implements TModel {
     buildAtPhi(this.dataProperty.value, this.phiProperty.value),
     () => this.dataProperty.value.rotation.rotatedAboutScreenAxis([1, 0, 0], SETTINGS.DEFAULT_VIEW_TILT),
     this.dataProperty.value.rotation,
+    SETTINGS.VIEWER_ZOOM,
   );
   private readonly geometryLink = Multilink.lazyMultilink([this.dataProperty, this.phiProperty], (data, phi) => {
     this.stereoViewModel.builtProperty.value = buildAtPhi(data, phi);

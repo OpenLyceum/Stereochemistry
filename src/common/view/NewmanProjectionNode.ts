@@ -10,8 +10,8 @@ import {
   STEREO_LAYOUT_SETTINGS as LAYOUT,
   NEWMAN_PROJECTION_SETTINGS as SETTINGS,
 } from "../../StereochemistryConstants.js";
-import { StereochemistryHotkeyData } from "../../StereochemistryHotkeyData.js";
 import type { NewmanSubstituents } from "../model/ConformationEnergy.js";
+import { StereochemistryHotkeyData } from "../StereochemistryHotkeyData.js";
 
 function onCircle(degrees: number, radius: number): Vector2 {
   const angle = (degrees * Math.PI) / 180;
@@ -21,7 +21,11 @@ function onCircle(degrees: number, radius: number): Vector2 {
 export class NewmanProjectionNode extends Node {
   private readonly disposeProjection: () => void;
 
-  public constructor(substituentsProperty: TReadOnlyProperty<NewmanSubstituents>, phiProperty: Property<number>) {
+  public constructor(
+    substituentsProperty: TReadOnlyProperty<NewmanSubstituents>,
+    phiProperty: Property<number>,
+    interactive = true,
+  ) {
     const manager = StringManager.getInstance();
     const strings = manager.getStereoStrings();
     const a11y = manager.getStereoA11yStrings();
@@ -71,38 +75,38 @@ export class NewmanProjectionNode extends Node {
               group.class === "CH3"
                 ? StereochemistryColors.methylColorProperty
                 : StereochemistryColors.hydrogenColorProperty;
-            const distance = Math.min(
-              ...opposing.map((angle) =>
-                Math.abs(
-                  (Math.atan2(
-                    Math.sin(((degrees - angle) * Math.PI) / 180),
-                    Math.cos(((degrees - angle) * Math.PI) / 180),
-                  ) *
-                    180) /
-                    Math.PI,
-                ),
-              ),
-            );
-            const offset = isBack
-              ? 0
-              : SETTINGS.ECLIPSED_FRONT_LABEL_OFFSET * Math.max(0, 1 - distance / SETTINGS.OVERLAP_ANGLE);
+            // Signed angle (degrees) to the nearest substituent on the other face. When the two are
+            // nearly eclipsed, both labels rotate away from each other so they never stack.
+            const nearest = opposing.reduce<number>((best, angle) => {
+              const radians = ((degrees - angle) * Math.PI) / 180;
+              const diff = (Math.atan2(Math.sin(radians), Math.cos(radians)) * 180) / Math.PI;
+              return Math.abs(diff) < Math.abs(best) ? diff : best;
+            }, Number.POSITIVE_INFINITY);
+            const direction = nearest > 0 || (nearest === 0 && isBack) ? 1 : -1;
+            const spread =
+              direction * SETTINGS.ECLIPSED_LABEL_SPREAD * Math.max(0, 1 - Math.abs(nearest) / SETTINGS.OVERLAP_ANGLE);
             labels.CH3.visible = group.class === "CH3";
             labels.H.visible = group.class === "H";
-            labels[group.class].center = onCircle(degrees, SETTINGS.LABEL_RADIUS + offset);
+            labels[group.class].center = onCircle(degrees + spread, SETTINGS.LABEL_RADIUS);
           });
         },
       };
     };
     const back = makeFace(true);
     const front = makeFace(false);
-    const children = [outline, ...back.nodes, ...front.nodes, dot, zone];
+    const children = [outline, ...back.nodes, ...front.nodes, dot];
     super({
-      children,
-      tagName: "div",
-      ariaRole: "application",
-      focusable: true,
-      accessibleName: strings.newmanStringProperty,
-      accessibleHelpText: a11y.newmanHelpStringProperty,
+      children: interactive ? [...children, zone] : children,
+      ...(interactive
+        ? {
+            tagName: "div",
+            ariaRole: "application",
+            accessibleNameBehavior: (_node, options, name) => ({ ...options, ariaLabel: name, innerContent: name }),
+            focusable: true,
+            accessibleName: strings.newmanStringProperty,
+            accessibleHelpText: a11y.newmanHelpStringProperty,
+          }
+        : { pickable: false }),
     });
 
     const update = Multilink.multilink([substituentsProperty, phiProperty], (substituents, phi) => {
@@ -113,6 +117,15 @@ export class NewmanProjectionNode extends Node {
         substituents.back.map(({ angle }) => angle + phi),
       );
     });
+    if (!interactive) {
+      this.disposeProjection = () => {
+        update.dispose();
+        for (const child of [...children, zone]) {
+          child.dispose();
+        }
+      };
+      return;
+    }
     const change = (delta: number) => {
       const next = phiProperty.value + delta;
       const turn = ANGLE.MAX_PHI - ANGLE.MIN_PHI;
@@ -163,7 +176,7 @@ export class NewmanProjectionNode extends Node {
       this.removeInputListener(keyboard);
       drag.dispose();
       keyboard.dispose();
-      for (const child of children) {
+      for (const child of [...children, zone]) {
         child.dispose();
       }
     };

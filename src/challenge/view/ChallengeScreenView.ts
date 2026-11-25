@@ -1,151 +1,182 @@
-/**
- * ChallengeScreenView.ts
- *
- * The top-level view for the simulation screen.
- *
- * All visual nodes are added here. Follow these conventions:
- *   - Use this.layoutBounds for positioning (never magic pixel values)
- *   - Keep a ResetAllButton that calls model.reset() and this.reset()
- *   - Override step(dt) for frame-by-frame animation
- *
- * ── Adding content ────────────────────────────────────────────────────────────
- * 1. Create Node subclasses in separate files (e.g. StereochemistryControlPanel.ts)
- * 2. Instantiate them here and call this.addChild(...)
- * 3. Link them to model properties:
- *      model.isRunningProperty.link( isRunning => { ... } );
- *
- * ── Layout bounds ─────────────────────────────────────────────────────────────
- * SceneryStack uses a virtual 1024×618 coordinate space by default.
- * this.layoutBounds gives you the full rectangle; use it for alignment:
- *   center, minX, maxX, minY, maxY, width, height
- */
-
-import { type EmptySelfOptions, optionize } from "scenerystack/phet-core";
-import { Node, Rectangle } from "scenerystack/scenery";
+/** Level selection, problem presentation, and scorecard for the Challenge screen. */
+import { Multilink, PatternStringProperty } from "scenerystack/axon";
+import { HBox, Node, VBox } from "scenerystack/scenery";
 import { ResetAllButton } from "scenerystack/scenery-phet";
 import { ScreenView, type ScreenViewOptions } from "scenerystack/sim";
 import { FLAT_RESET_ALL_BUTTON_OPTIONS } from "../../common/StereochemistryButtonOptions.js";
-import StereochemistryColors from "../../StereochemistryColors.js";
-import { SCREEN_VIEW_MARGIN } from "../../StereochemistryConstants.js";
-import type { ChallengeModel } from "../model/ChallengeModel.js";
+import { StereochemistryPanel } from "../../common/StereochemistryPanel.js";
+import { stereoButton, stereoText } from "../../common/view/StereoControls.js";
+import { StringManager } from "../../i18n/StringManager.js";
+import Colors from "../../StereochemistryColors.js";
+import {
+  STEREO_LAYOUT_SETTINGS as LAYOUT,
+  SCREEN_VIEW_MARGIN,
+  CHALLENGE_SETTINGS as SETTINGS,
+} from "../../StereochemistryConstants.js";
+import { type ChallengeModel, PERFECT_SCORE, PROBLEMS_PER_ROUND } from "../model/ChallengeModel.js";
+import { type ChallengeProblem, LEVELS } from "../model/challengeProblems.js";
+import { ChallengeProblemNode } from "./ChallengeProblemNode.js";
 import { ChallengeScreenSummaryContent } from "./ChallengeScreenSummaryContent.js";
-
-export type ChallengeScreenViewOptions = ScreenViewOptions;
+import { challengeReadouts, levelLabels } from "./challengeReadouts.js";
+import { RoundCompletedPanel } from "./RoundCompletedPanel.js";
 
 export class ChallengeScreenView extends ScreenView {
-  public constructor(model: ChallengeModel, providedOptions?: ChallengeScreenViewOptions) {
-    // ── Accessibility: screen summary ───────────────────────────────────────────
-    // The screen summary is the first thing a screen-reader user encounters. It
-    // is registered here, in the ScreenView's super() options, so every sim wires
-    // it the same way. See ChallengeScreenSummaryContent for the four content regions.
-    const options = optionize<ChallengeScreenViewOptions, EmptySelfOptions, ScreenViewOptions>()(
-      {
-        screenSummaryContent: new ChallengeScreenSummaryContent(model),
-      },
-      providedOptions,
-    );
-    super(options);
+  public constructor(model: ChallengeModel, options?: ScreenViewOptions) {
+    const manager = StringManager.getInstance();
+    const strings = manager.getChallengeStrings();
+    const readouts = challengeReadouts(model);
+    super({ ...options, screenSummaryContent: new ChallengeScreenSummaryContent(model, readouts) });
 
-    // ── Background ────────────────────────────────────────────────────────────
-    // A full-screen rectangle that follows the active color profile.
-    // Replace or remove once you add real content.
-    const backgroundRect = new Rectangle(0, 0, this.layoutBounds.width, this.layoutBounds.height, {
-      fill: StereochemistryColors.backgroundColorProperty,
+    const { centerX, centerY, minY, maxX, maxY, width } = this.layoutBounds;
+    let activeProblem: ChallengeProblemNode | null = null;
+    const levels = Object.values(LEVELS);
+    const backToLevels = () => {
+      const current = model.levelProperty.value;
+      model.leaveLevel();
+      levelButtons[current === null ? 0 : current - 1]?.focus();
+    };
+    const levelButtons = levels.map((level, index) => {
+      const button = stereoButton(levelLabels[level], () => {
+        model.startLevel(level);
+        activeProblem?.firstControl.focus();
+      });
+      const bestScoreProperty = model.bestScoreProperties[index];
+      if (bestScoreProperty) {
+        button.accessibleName = new PatternStringProperty(strings.levelBestStringProperty, {
+          level: levelLabels[level],
+          points: bestScoreProperty,
+          total: PERFECT_SCORE,
+        });
+      }
+      return button;
     });
-    this.addChild(backgroundRect);
-
-    // ── Accessibility: per-control names ────────────────────────────────────────
-    // EVERY interactive node must carry an `accessibleName` (and an
-    // `accessibleHelpText` where useful), sourced from the StringManager `a11y`
-    // string group — never a hard-coded English literal. Sun/scenery-phet controls
-    // (NumberControl, Checkbox, ComboBox, AquaRadioButtonGroup, …) accept it as an
-    // option; a draggable plain Node needs `tagName: "div", focusable: true` too.
-    // Example (uncomment and adapt when you add a real control; add the
-    // `a11y.controls.startButton` string to every strings_*.json first):
-    //
-    //   const a11y = StringManager.getInstance().getA11yStrings();
-    //   const startButton = new RectangularPushButton({
-    //     ...FLAT_RECTANGULAR_BUTTON_OPTIONS, // flat appearance, not SceneryStack's default 3-D look
-    //     content: someIcon,
-    //     listener: () => model.start(),
-    //     accessibleName: a11y.controls.startButtonStringProperty,
-    //   });
-    //   this.addChild(startButton);
-
-    // ── Reset All button ──────────────────────────────────────────────────────
-    // Always position at bottom-right (PhET convention).
-    const resetAllButton = new ResetAllButton({
-      ...FLAT_RESET_ALL_BUTTON_OPTIONS,
-      listener: () => {
-        model.reset();
-        this.reset();
-      },
-      right: this.layoutBounds.maxX - SCREEN_VIEW_MARGIN,
-      bottom: this.layoutBounds.maxY - SCREEN_VIEW_MARGIN,
+    const levelRows = new VBox({
+      spacing: LAYOUT.GAP,
+      children: levels.map((level, index) => {
+        const bestScoreProperty = model.bestScoreProperties[index];
+        const button = levelButtons[index];
+        if (!(bestScoreProperty && button)) {
+          throw new Error(`Missing level controls for ${level}`);
+        }
+        const scoreProperty = new PatternStringProperty(strings.scoreStringProperty, {
+          points: bestScoreProperty,
+          total: PERFECT_SCORE,
+        });
+        return new HBox({ spacing: LAYOUT.GAP, children: [button, stereoText(scoreProperty)] });
+      }),
     });
-    this.addChild(resetAllButton);
-
-    // ── Accessibility: keyboard / reading traversal order ───────────────────────
-    // Make the parallel DOM (Tab order and screen-reader reading order)
-    // deterministic and independent of child z-order. ScreenView throws if you
-    // set pdomOrder on itself, so add a lightweight wrapper Node that "borrows"
-    // the interactive nodes in the order a user should reach them — Reset All
-    // last. Non-interactive decoration (background, placeholder) is omitted.
-    this.addChild(
-      new Node({
-        pdomOrder: [
-          // TODO: add the sim's interactive nodes here, in traversal order
-          resetAllButton,
-        ],
+    const selection = new StereochemistryPanel(
+      new VBox({
+        spacing: LAYOUT.GAP,
+        children: [stereoText(strings.chooseLevelStringProperty, LAYOUT.HEADING_FONT_SIZE), levelRows],
       }),
     );
-  }
+    selection.boundsProperty.link(() => {
+      selection.center = this.layoutBounds.center;
+    });
 
-  /**
-   * Resets view-side state (animations, panel visibility, etc.).
-   * Called by the Reset All button listener.
-   */
-  public reset(): void {
-    // TODO: reset any view-side state here
-  }
+    const complete = new RoundCompletedPanel(model.scoreProperty, readouts.scoreProperty, backToLevels);
+    complete.boundsProperty.link(() => {
+      complete.centerX = centerX;
+      complete.centerY = centerY;
+    });
 
-  /**
-   * Steps the view forward by dt seconds for animation.
-   * @param _dt - elapsed time in seconds
-   */
-  public override step(_dt: number): void {
-    // TODO: implement animation updates here
-  }
+    const back = stereoButton(strings.backStringProperty, backToLevels);
+    const toggleHint = () => {
+      model.toggleHint();
+      (model.hintProperty.value ? hideHint : hint).focus();
+    };
+    const hint = stereoButton(strings.hintStringProperty, toggleHint);
+    const hideHint = stereoButton(strings.hideHintStringProperty, toggleHint);
+    const advance = () => {
+      model.nextProblem();
+      if (model.roundCompleteProperty.value) {
+        complete.levelsButton.focus();
+        this.addAccessibleResponse(readouts.scoreProperty);
+      } else {
+        activeProblem?.firstControl.focus();
+      }
+    };
+    const next = stereoButton(strings.nextStringProperty, advance);
+    const finish = stereoButton(strings.finishStringProperty, advance);
+    const answer = (choice: ChallengeProblem["answer"]) => {
+      const wasChoosingPercent = model.choosingPercentProperty.value;
+      model.submit(choice);
+      if (model.solvedProperty.value) {
+        (model.problemNumberProperty.value === PROBLEMS_PER_ROUND ? finish : next).focus();
+      } else if (!wasChoosingPercent && model.choosingPercentProperty.value) {
+        activeProblem?.firstPopulationChoice?.focus();
+      }
+      this.addAccessibleResponse(readouts.feedbackProperty);
+    };
 
-  // ── Accessibility / listeners: dispose ─────────────────────────────────────
-  // ScreenView is `isDisposable: false` and lives for the whole sim, so this
-  // class rarely needs dispose(). Child Nodes (and a live currentDetails
-  // DerivedProperty you own on a short-lived object) do. When you add
-  // DerivedProperty / Multilink / Property.link against model state, keep the
-  // references and tear them down — forks copy what they see. Pattern:
-  //
-  // private readonly disposeChallengeScreenView: () => void;
-  //
-  // // in the constructor, after creating the listeners:
-  // const statusMultilink = Multilink.multilink(
-  //   [model.someProperty, model.otherProperty],
-  //   (a, b) => { /* update view from model */ },
-  // );
-  // const detailsProperty = new DerivedProperty(
-  //   [model.stateProperty],
-  //   (state) => `State: ${state}`,
-  // ); // → pass as currentDetailsContent in ChallengeScreenSummaryContent
-  // const onExternal = (v: number) => { /* … */ };
-  // model.externalProperty.link(onExternal); // Property you do NOT own
-  //
-  // this.disposeChallengeScreenView = () => {
-  //   statusMultilink.dispose();                 // Multilink you created
-  //   detailsProperty.dispose();                 // DerivedProperty you created
-  //   model.externalProperty.unlink(onExternal); // undo external link
-  // };
-  //
-  // public override dispose(): void {
-  //   this.disposeChallengeScreenView();
-  //   super.dispose();
-  // }
+    const fullWidth = width - 2 * SCREEN_VIEW_MARGIN;
+    const header = new VBox({
+      spacing: LAYOUT.ROW_GAP,
+      children: [
+        stereoText(readouts.progressProperty, LAYOUT.SMALL_FONT_SIZE, Colors.textColorProperty, fullWidth),
+        stereoText(readouts.promptProperty, LAYOUT.HEADING_FONT_SIZE, Colors.textColorProperty, fullWidth),
+      ],
+    });
+    const problemArea = new Node();
+    const feedback = stereoText(readouts.feedbackProperty, LAYOUT.FONT_SIZE, Colors.accentColorProperty, fullWidth);
+    const actions = new HBox({
+      spacing: LAYOUT.GAP,
+      excludeInvisibleChildrenFromBounds: true,
+      children: [back, hint, hideHint, next, finish],
+    });
+    const footer = new VBox({ spacing: LAYOUT.ROW_GAP, children: [feedback, actions] });
+    const play = new Node({ children: [header, problemArea, footer] });
+    header.boundsProperty.link(() => {
+      header.centerX = centerX;
+      header.top = minY + SCREEN_VIEW_MARGIN;
+    });
+    footer.boundsProperty.link(() => {
+      footer.centerX = centerX;
+      footer.bottom = maxY - SETTINGS.FOOTER_BOTTOM;
+    });
+
+    const alignProblem = () => {
+      if (activeProblem) {
+        activeProblem.centerX = centerX;
+        activeProblem.top = minY + SETTINGS.ROUND_TOP;
+      }
+    };
+    problemArea.boundsProperty.lazyLink(alignProblem);
+    model.problemProperty.link((problem) => {
+      if (activeProblem) {
+        problemArea.removeChild(activeProblem);
+        activeProblem.dispose();
+      }
+      activeProblem = problem ? new ChallengeProblemNode(problem, model, answer) : null;
+      if (activeProblem) {
+        problemArea.addChild(activeProblem);
+        alignProblem();
+      }
+    });
+    Multilink.multilink([model.levelProperty, model.roundCompleteProperty], (level, completed) => {
+      selection.visible = level === null;
+      play.visible = level !== null && !completed;
+      complete.visible = completed;
+    });
+    Multilink.multilink(
+      [model.hintProperty, model.solvedProperty, model.problemNumberProperty],
+      (show, solved, number) => {
+        hint.visible = !(solved || show);
+        hideHint.visible = !solved && show;
+        finish.visible = solved && number === PROBLEMS_PER_ROUND;
+        next.visible = solved && !finish.visible;
+      },
+    );
+    const reset = new ResetAllButton({
+      ...FLAT_RESET_ALL_BUTTON_OPTIONS,
+      listener: () => {
+        this.interruptSubtreeInput();
+        model.reset();
+      },
+      right: maxX - SCREEN_VIEW_MARGIN,
+      bottom: maxY - SCREEN_VIEW_MARGIN,
+    });
+    this.children = [selection, play, complete, reset, new Node({ pdomOrder: [selection, play, complete, reset] })];
+  }
 }

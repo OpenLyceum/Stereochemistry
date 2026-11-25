@@ -2,6 +2,7 @@
 
 import {
   CONFORMATION_ENERGY_SETTINGS,
+  CYCLOHEXANE_SCREEN_SETTINGS,
   MOLECULE_BUILDER_SETTINGS,
   CYCLOHEXANE_SETTINGS as SETTINGS,
 } from "../../StereochemistryConstants.js";
@@ -9,10 +10,10 @@ import { assembleMolecule, type BuiltMolecule, bondLength, expandHydrogens, nerf
 import { type Adjacency, adjacency, positionAt } from "./MoleculeGraph.js";
 import type { BondSpec, HeavyAtomSpec } from "./MoleculeSpec.js";
 import { cross, normalize, subtract, type Vec3 } from "./structure/Geometry.js";
+import { Rotation3 } from "./structure/Rotation3.js";
 
 /**
  * Reference A-values exposed for direct comparison with chair-strain calculations in tests.
- * @internal
  */
 export const A_VALUES = SETTINGS.A_VALUES;
 type Group = keyof typeof A_VALUES;
@@ -21,6 +22,15 @@ export type RingSubstituent = { readonly carbon: number; readonly face: Face; re
 
 type RingMolecule = BuiltMolecule & { axial: boolean[]; slotAtoms: number[] };
 const { RING_SIZE } = SETTINGS;
+
+/** Frame chairs from the side so their puckering and axial bonds are visible. */
+export function chairViewRotation(): Rotation3 {
+  // The ring mean plane is xy, with C1–C4 along x in that plane.
+  return new Rotation3([1, 0, 0, 0, 0, 1, 0, -1, 0]).rotatedAboutScreenAxis(
+    [1, 0, 0],
+    CYCLOHEXANE_SCREEN_SETTINGS.VIEW_TILT,
+  );
+}
 
 /** Heavy substituent topology, rooted at local atom zero. Each remaining carbon bonds to that root. */
 const GROUP_ATOMS = {

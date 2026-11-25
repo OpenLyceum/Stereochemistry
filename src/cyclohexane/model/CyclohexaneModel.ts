@@ -4,6 +4,7 @@ import type { TModel } from "scenerystack/joist";
 import {
   buildCyclohexane,
   chairStrain,
+  chairViewRotation,
   cisTrans,
   diaxialPartners,
   equilibrium,
@@ -13,7 +14,6 @@ import {
 } from "../../common/model/Cyclohexane.js";
 import { CYCLOHEXANE_LIBRARY } from "../../common/model/MoleculeLibrary.js";
 import { StereoViewModel } from "../../common/model/StereoViewModel.js";
-import { Rotation3 } from "../../common/model/structure/Rotation3.js";
 import { CYCLOHEXANE_SCREEN_SETTINGS as SETTINGS } from "../../StereochemistryConstants.js";
 
 const DEFAULT_PRESET = "methylcyclohexane";
@@ -50,10 +50,7 @@ export class CyclohexaneModel implements TModel {
       return new Vector2(s, ringEnergy(s) + (1 - s) * A + s * B);
     }),
   );
-  public readonly stereoViewModel = new StereoViewModel(this.ringProperty.value, () =>
-    // The ring mean plane is xy, with C1–C4 along x in that plane.
-    new Rotation3([1, 0, 0, 0, 0, 1, 0, -1, 0]).rotatedAboutScreenAxis([1, 0, 0], SETTINGS.VIEW_TILT),
-  );
+  public readonly stereoViewModel = new StereoViewModel(this.ringProperty.value, chairViewRotation);
   private target = 0;
 
   private readonly displayLink = Multilink.multilink(

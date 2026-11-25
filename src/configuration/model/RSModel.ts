@@ -7,6 +7,7 @@ import { positionAt } from "../../common/model/MoleculeGraph.js";
 import { CHIRALITY_MOLECULES } from "../../common/model/MoleculeLibrary.js";
 import { assignRS, findStereocentres } from "../../common/model/Stereocentres.js";
 import { StereoViewModel } from "../../common/model/StereoViewModel.js";
+import { separatedLigandRotation } from "../../common/model/separatedLigandRotation.js";
 import { normalize, subtract, type Vec3 } from "../../common/model/structure/Geometry.js";
 import { Rotation3 } from "../../common/model/structure/Rotation3.js";
 import { RS_SCREEN_SETTINGS as SETTINGS } from "../../StereochemistryConstants.js";
@@ -35,9 +36,7 @@ export class RSModel implements TModel {
   public readonly centreProperty = new Property<number | null>(this.stereocentresProperty.value[0] ?? null);
   public readonly showPrioritiesProperty = new BooleanProperty(true);
   public readonly answerProperty = new Property<Answer | null>(null);
-  public readonly stereoViewModel = new StereoViewModel(this.builtProperty.value, () =>
-    Rotation3.aboutAxis([0, 1, 0], SETTINGS.INITIAL_TURN),
-  );
+  public readonly stereoViewModel = new StereoViewModel(this.builtProperty.value, separatedLigandRotation);
   private readonly selectionProperty = new DerivedProperty(
     [this.builtProperty, this.centreProperty],
     ({ structure, positions }, centre) => {

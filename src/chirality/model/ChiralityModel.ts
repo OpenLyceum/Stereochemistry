@@ -8,6 +8,7 @@ import { adjacency, type BuiltMolecule, positionAt } from "../../common/model/Mo
 import { CHIRALITY_MOLECULES } from "../../common/model/MoleculeLibrary.js";
 import { descriptors, isChiral, kabschAlign, mirrorAtomPermutation } from "../../common/model/Stereocentres.js";
 import { StereoViewModel } from "../../common/model/StereoViewModel.js";
+import { separatedLigandRotation } from "../../common/model/separatedLigandRotation.js";
 import { distance, normalize, subtract, type Vec3 } from "../../common/model/structure/Geometry.js";
 import { Rotation3 } from "../../common/model/structure/Rotation3.js";
 import { CHIRALITY_SCREEN_SETTINGS as SETTINGS } from "../../StereochemistryConstants.js";
@@ -83,9 +84,7 @@ export class ChiralityModel implements TModel {
     [this.superimposeProgressProperty],
     (progress) => progress === 1,
   );
-  public readonly originalView = new StereoViewModel(this.builtProperty.value, () =>
-    Rotation3.aboutAxis([1, 0, 0], SETTINGS.INITIAL_TILT).rotatedAboutScreenAxis([0, 1, 0], SETTINGS.INITIAL_TURN),
-  );
+  public readonly originalView = new StereoViewModel(this.builtProperty.value, separatedLigandRotation);
   public readonly mirrorView = new StereoViewModel(this.reflectedProperty.value);
   public readonly alignmentRmsdProperty = new Property<number | null>(null);
   private fit: ReturnType<typeof comparison> | null = null;

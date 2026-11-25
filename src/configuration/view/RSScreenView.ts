@@ -1,9 +1,9 @@
 /** R/S practice view with a live priority arrow, wedge drawing, and CIP explanation. */
-import { Multilink, Property } from "scenerystack/axon";
+import { Multilink } from "scenerystack/axon";
 import { Bounds2, Vector2 } from "scenerystack/dot";
 import { Shape } from "scenerystack/kite";
-import { HBox, Node, Path, Rectangle, VBox } from "scenerystack/scenery";
-import { ResetAllButton } from "scenerystack/scenery-phet";
+import { HBox, Node, Path, RichText, VBox } from "scenerystack/scenery";
+import { PhetFont, ResetAllButton } from "scenerystack/scenery-phet";
 import { ScreenView, type ScreenViewOptions } from "scenerystack/sim";
 import { FLAT_RESET_ALL_BUTTON_OPTIONS } from "../../common/StereochemistryButtonOptions.js";
 import { StereochemistryPanel } from "../../common/StereochemistryPanel.js";
@@ -55,13 +55,14 @@ function priorityArrow(first: Vector2, middle: Vector2, last: Vector2): Shape | 
 export class RSScreenView extends ScreenView {
   public constructor(model: RSModel, options?: ScreenViewOptions) {
     const readouts = rsReadouts(model);
-    super({ ...options, screenSummaryContent: new RSScreenSummaryContent(readouts) });
+    super({ ...options, screenSummaryContent: new RSScreenSummaryContent(model, readouts) });
     const manager = StringManager.getInstance();
     const strings = manager.getRSStrings();
     const shared = manager.getStereoStrings();
     const bounds = new Bounds2(0, 0, SETTINGS.VIEWPORT_WIDTH, SETTINGS.VIEWPORT_HEIGHT);
     const stereo = model.stereoViewModel;
     const viewer = new StereoViewerNode(stereo, bounds, {
+      labelCentreProperty: model.centreProperty,
       canPick: (index) => model.stereocentresProperty.value.includes(index),
       appearanceDependencies: [model.cipProperty, model.showPrioritiesProperty, ...PRIORITY_COLORS],
       atomColor: (index) => {
@@ -121,18 +122,19 @@ export class RSScreenView extends ScreenView {
     const traceProperty = cipExplanationProperty(model);
     const lines = new VBox({ align: "left", spacing: LAYOUT.ROW_GAP, accessibleParagraph: "" });
     const traceHeading = stereoText(strings.traceStringProperty, LAYOUT.HEADING_FONT_SIZE);
-    const tracePanel = new StereochemistryPanel(
-      new Node({
-        children: [new Rectangle(0, 0, SETTINGS.EXPLANATION_WIDTH, bounds.height), lines],
-      }),
-    );
+    const tracePanel = new StereochemistryPanel(lines);
     Multilink.multilink([traceProperty, strings.noCentreStringProperty], (trace, noCentre) => {
       for (const line of [...lines.children]) {
         line.dispose();
       }
       const displayed = trace.length > 0 ? trace : [noCentre];
-      lines.children = displayed.map((line) =>
-        stereoText(new Property(line), LAYOUT.FONT_SIZE, Colors.textColorProperty, SETTINGS.EXPLANATION_WIDTH),
+      lines.children = displayed.map(
+        (line) =>
+          new RichText(line, {
+            font: new PhetFont(LAYOUT.FONT_SIZE),
+            fill: Colors.textColorProperty,
+            lineWrap: SETTINGS.EXPLANATION_WIDTH,
+          }),
       );
       lines.accessibleParagraph = displayed.join(" ");
     });

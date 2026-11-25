@@ -1,8 +1,9 @@
 // Copied from OpenLyceum/MolScope@6bb92af; trimmed: unused type exports only.
-import { roundSymmetric } from "scenerystack/dot";
+import { distToSegment, roundSymmetric, Vector2 } from "scenerystack/dot";
 import StereochemistryColors from "../../StereochemistryColors.js";
 import {
   MOLECULE_RENDERER_APPEARANCE_SETTINGS as APPEARANCE,
+  CAMERA_GRID_SETTINGS,
   MOLECULE_RENDERER_SETTINGS,
 } from "../../StereochemistryConstants.js";
 /**
@@ -84,6 +85,7 @@ type PolymerProjection = {
 
 type OverlayColors = {
   readonly label: string;
+  readonly labelOutline?: string;
   readonly measurement: string;
   readonly unitCell: string;
   readonly halo: string;
@@ -119,6 +121,7 @@ type RenderInput = {
   readonly picked: number | null;
   readonly pendingPicks: readonly number[];
   readonly measurements: readonly Measurement[];
+  readonly labelCentre?: number | null;
   readonly measurementLabelOffsetX?: number;
   readonly measurementLabel: (measurement: Measurement) => string;
   readonly axisLabels: readonly [string, string, string];
@@ -845,23 +848,72 @@ export class MoleculeRenderer {
     }
   }
 
-  /** Labels sit to the upper right of their atom. */
+  /** Find space along the outward ray, starting just beyond the ligand's sphere. */
+  private priorityLabelPosition(input: RenderInput, index: number, centre: number): Vector2 {
+    const { PRIORITY_LABEL_GAP: gap, PRIORITY_LABEL_ATTEMPTS: attempts } = CAMERA_GRID_SETTINGS;
+    const pointAt = (atom: number) => new Vector2(this.sx[atom] ?? 0, this.sy[atom] ?? 0);
+    const atomPoint = pointAt(index);
+    const direction = atomPoint.minus(pointAt(centre));
+    const unit = direction.magnitudeSquared > 0 ? direction.normalized() : new Vector2(0, -1);
+    const start = atomPoint.plus(unit.timesScalar((this.sr[index] ?? 0) + gap));
+    const { state } = input;
+    for (let step = 0; step < attempts; step++) {
+      const candidate = start.plus(unit.timesScalar(step * gap));
+      if (
+        candidate.x < gap ||
+        candidate.x > input.width - gap ||
+        candidate.y < gap ||
+        candidate.y > input.height - gap
+      ) {
+        break;
+      }
+      const overlapsAtom = state.structure.atoms.some(
+        (_atom, i) => i !== index && !state.hidden[i] && candidate.distance(pointAt(i)) < (this.sr[i] ?? 0) + gap,
+      );
+      const overlapsBond = state.structure.bonds.some(
+        ({ a, b }) => !(state.hidden[a] || state.hidden[b]) && distToSegment(candidate, pointAt(a), pointAt(b)) < gap,
+      );
+      if (!(overlapsAtom || overlapsBond)) {
+        return candidate;
+      }
+    }
+    return start;
+  }
+
+  /** CIP labels sit just beyond the ligand along its projected bond direction. */
   private paintAtomLabels(ctx: CanvasRenderingContext2D, input: RenderInput): void {
     const { state, colors } = input;
+    ctx.save();
     ctx.font = input.font;
     ctx.fillStyle = colors.label;
-    ctx.textBaseline = "bottom";
+    const centre = input.labelCentre;
     for (let i = 0; i < state.atomCount; i++) {
       const label = state.labels[i];
       if (label && !state.hidden[i]) {
-        const r = Math.max(this.sr[i] ?? 0, APPEARANCE.LABEL_ANCHOR_MIN_RADIUS) * APPEARANCE.LABEL_ANCHOR_RADIUS_FACTOR;
-        ctx.fillText(
-          label,
-          (this.sx[i] ?? 0) + r + APPEARANCE.LABEL_PADDING,
-          (this.sy[i] ?? 0) - r - APPEARANCE.LABEL_PADDING,
-        );
+        const x = this.sx[i] ?? 0;
+        const y = this.sy[i] ?? 0;
+        const radius = this.sr[i] ?? 0;
+        if (centre !== undefined && centre !== null) {
+          const position = this.priorityLabelPosition(input, i, centre);
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          if (colors.labelOutline) {
+            ctx.strokeStyle = colors.labelOutline;
+            ctx.lineWidth = CAMERA_GRID_SETTINGS.PRIORITY_LABEL_OUTLINE_WIDTH;
+            ctx.strokeText(label, position.x, position.y);
+          }
+          ctx.fillText(label, position.x, position.y);
+        } else {
+          const offset =
+            Math.max(radius, APPEARANCE.LABEL_ANCHOR_MIN_RADIUS) * APPEARANCE.LABEL_ANCHOR_RADIUS_FACTOR +
+            APPEARANCE.LABEL_PADDING;
+          ctx.textAlign = "left";
+          ctx.textBaseline = "bottom";
+          ctx.fillText(label, x + offset, y - offset);
+        }
       }
     }
+    ctx.restore();
   }
 
   /** Measurements: dashed polyline through the atoms, value at the middle. */

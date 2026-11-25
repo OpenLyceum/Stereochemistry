@@ -27,15 +27,12 @@ import { RSScreen } from "./configuration/RSScreen.js";
 import { ConformationsScreen } from "./conformations/ConformationsScreen.js";
 import { CyclohexaneScreen } from "./cyclohexane/CyclohexaneScreen.js";
 import { StringManager } from "./i18n/StringManager.js";
-import { StereochemistryPreferencesModel } from "./preferences/StereochemistryPreferencesModel.js";
+import "./preferences/StereochemistryPreferencesModel.js";
 import { StereochemistryPreferencesNode } from "./preferences/StereochemistryPreferencesNode.js";
 import StereochemistryColors from "./StereochemistryColors.js";
 
 onReadyToLaunch(() => {
   const stringManager = StringManager.getInstance();
-
-  // Simulation-specific preferences; initial values come from stereochemistryQueryParameters.
-  const simPreferences = new StereochemistryPreferencesModel(Tandem.ROOT.createTandem("preferences"));
 
   const screens = [
     new ChiralityScreen({
@@ -76,7 +73,7 @@ onReadyToLaunch(() => {
       simulationOptions: {
         customPreferences: [
           {
-            createContent: (tandem: Tandem) => new StereochemistryPreferencesNode(simPreferences, tandem),
+            createContent: () => new StereochemistryPreferencesNode(),
           },
         ],
       },

@@ -23,9 +23,22 @@ export class CyclohexaneScreenSummaryContent extends ScreenSummaryContent {
         return id === "custom" ? strings.customStringProperty.value : names[`${id}StringProperty`].value;
       },
     );
+    const geometryProperty = new DerivedProperty(
+      [model.flipProperty, strings.chairAStringProperty, strings.chairBStringProperty, a11y.inProgressStringProperty],
+      (progress, a, b, inProgress) => (progress === 0 ? a : progress === 1 ? b : inProgress),
+    );
     super({
-      playAreaContent: a11y.screenSummary.playAreaStringProperty,
-      controlAreaContent: a11y.screenSummary.controlAreaStringProperty,
+      playAreaContent: new PatternStringProperty(a11y.screenSummary.playAreaStringProperty, {
+        geometry: geometryProperty,
+      }),
+      controlAreaContent: new DerivedProperty(
+        [
+          model.flippingProperty,
+          a11y.screenSummary.controlAreaStringProperty,
+          a11y.screenSummary.flippingStringProperty,
+        ],
+        (flipping, controls, reverse) => (flipping ? reverse : controls),
+      ),
       currentDetailsContent: new PatternStringProperty(a11y.currentDetailsStringProperty, {
         preset: presetProperty,
         populations: chairPopulationsProperty(model),
