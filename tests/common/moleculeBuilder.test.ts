@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import { buildMolecule, mirror } from "../../src/common/model/MoleculeBuilder.js";
 import { adjacency, positionAt } from "../../src/common/model/MoleculeGraph.js";
 import { MOLECULE_LIBRARY } from "../../src/common/model/MoleculeLibrary.js";
-import { angle, dihedral, distance } from "../../src/common/model/structure/Geometry.js";
+import { dihedral, distance } from "../../src/common/model/structure/Geometry.js";
+import { angle } from "./geometryHelpers.js";
 import { required } from "./required.js";
 
 describe("molecule builder", () => {

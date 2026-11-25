@@ -10,7 +10,8 @@ import {
 } from "../../src/common/model/Cyclohexane.js";
 import { positionAt } from "../../src/common/model/MoleculeGraph.js";
 import { CYCLOHEXANE_LIBRARY } from "../../src/common/model/MoleculeLibrary.js";
-import { angle, distance } from "../../src/common/model/structure/Geometry.js";
+import { distance } from "../../src/common/model/structure/Geometry.js";
+import { angle } from "./geometryHelpers.js";
 
 function substitutions(id: string) {
   const preset = CYCLOHEXANE_LIBRARY.find((entry) => entry.id === id);

@@ -35,16 +35,6 @@ export function distance(a: Vec3, b: Vec3): number {
   return Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 }
 
-/**
- * Angle a–b–c at vertex b in degrees, used to verify generated bond geometry.
- */
-export function angle(a: Vec3, b: Vec3, c: Vec3): number {
-  const u = normalize(subtract(a, b));
-  const v = normalize(subtract(c, b));
-  const cosine = Math.min(1, Math.max(-1, dot(u, v)));
-  return (Math.acos(cosine) * 180) / Math.PI;
-}
-
 /** Dihedral a–b–c–d about the b–c axis, degrees in (−180, 180]. */
 export function dihedral(a: Vec3, b: Vec3, c: Vec3, d: Vec3): number {
   const b1 = subtract(b, a);
