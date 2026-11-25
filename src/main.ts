@@ -21,24 +21,47 @@ import "./brand.js";
 
 import { onReadyToLaunch, PreferencesModel, Sim } from "scenerystack/sim";
 import { Tandem } from "scenerystack/tandem";
+import { ChallengeScreen } from "./challenge/ChallengeScreen.js";
+import { ChiralityScreen } from "./chirality/ChiralityScreen.js";
+import { RSScreen } from "./configuration/RSScreen.js";
+import { ConformationsScreen } from "./conformations/ConformationsScreen.js";
+import { CyclohexaneScreen } from "./cyclohexane/CyclohexaneScreen.js";
 import { StringManager } from "./i18n/StringManager.js";
-import { SimPreferencesModel } from "./preferences/SimPreferencesModel.js";
-import { SimPreferencesNode } from "./preferences/SimPreferencesNode.js";
-import SimColors from "./SimColors.js";
-import { SimScreen } from "./sim-screen/SimScreen.js";
+import { StereochemistryPreferencesModel } from "./preferences/StereochemistryPreferencesModel.js";
+import { StereochemistryPreferencesNode } from "./preferences/StereochemistryPreferencesNode.js";
+import StereochemistryColors from "./StereochemistryColors.js";
 
 onReadyToLaunch(() => {
   const stringManager = StringManager.getInstance();
 
-  // Simulation-specific preferences; initial values come from simQueryParameters.
-  const simPreferences = new SimPreferencesModel(Tandem.ROOT.createTandem("preferences"));
+  // Simulation-specific preferences; initial values come from stereochemistryQueryParameters.
+  const simPreferences = new StereochemistryPreferencesModel(Tandem.ROOT.createTandem("preferences"));
 
   const screens = [
-    new SimScreen({
-      // The screen name Property updates automatically when the locale changes
-      name: stringManager.getScreenNames().simStringProperty,
-      tandem: Tandem.ROOT.createTandem("simScreen"),
-      backgroundColorProperty: SimColors.backgroundColorProperty,
+    new ChiralityScreen({
+      name: stringManager.getScreenNames().chiralityStringProperty,
+      tandem: Tandem.ROOT.createTandem("chiralityScreen"),
+      backgroundColorProperty: StereochemistryColors.backgroundColorProperty,
+    }),
+    new RSScreen({
+      name: stringManager.getScreenNames().configurationStringProperty,
+      tandem: Tandem.ROOT.createTandem("configurationScreen"),
+      backgroundColorProperty: StereochemistryColors.backgroundColorProperty,
+    }),
+    new ConformationsScreen({
+      name: stringManager.getScreenNames().conformationsStringProperty,
+      tandem: Tandem.ROOT.createTandem("conformationsScreen"),
+      backgroundColorProperty: StereochemistryColors.backgroundColorProperty,
+    }),
+    new CyclohexaneScreen({
+      name: stringManager.getScreenNames().cyclohexaneStringProperty,
+      tandem: Tandem.ROOT.createTandem("cyclohexaneScreen"),
+      backgroundColorProperty: StereochemistryColors.backgroundColorProperty,
+    }),
+    new ChallengeScreen({
+      name: stringManager.getScreenNames().challengeStringProperty,
+      tandem: Tandem.ROOT.createTandem("challengeScreen"),
+      backgroundColorProperty: StereochemistryColors.backgroundColorProperty,
     }),
   ];
 
@@ -53,7 +76,7 @@ onReadyToLaunch(() => {
       simulationOptions: {
         customPreferences: [
           {
-            createContent: (tandem: Tandem) => new SimPreferencesNode(simPreferences, tandem),
+            createContent: (tandem: Tandem) => new StereochemistryPreferencesNode(simPreferences, tandem),
           },
         ],
       },

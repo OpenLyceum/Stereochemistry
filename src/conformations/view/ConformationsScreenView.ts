@@ -1,0 +1,151 @@
+/**
+ * ConformationsScreenView.ts
+ *
+ * The top-level view for the simulation screen.
+ *
+ * All visual nodes are added here. Follow these conventions:
+ *   - Use this.layoutBounds for positioning (never magic pixel values)
+ *   - Keep a ResetAllButton that calls model.reset() and this.reset()
+ *   - Override step(dt) for frame-by-frame animation
+ *
+ * ── Adding content ────────────────────────────────────────────────────────────
+ * 1. Create Node subclasses in separate files (e.g. StereochemistryControlPanel.ts)
+ * 2. Instantiate them here and call this.addChild(...)
+ * 3. Link them to model properties:
+ *      model.isRunningProperty.link( isRunning => { ... } );
+ *
+ * ── Layout bounds ─────────────────────────────────────────────────────────────
+ * SceneryStack uses a virtual 1024×618 coordinate space by default.
+ * this.layoutBounds gives you the full rectangle; use it for alignment:
+ *   center, minX, maxX, minY, maxY, width, height
+ */
+
+import { type EmptySelfOptions, optionize } from "scenerystack/phet-core";
+import { Node, Rectangle } from "scenerystack/scenery";
+import { ResetAllButton } from "scenerystack/scenery-phet";
+import { ScreenView, type ScreenViewOptions } from "scenerystack/sim";
+import { FLAT_RESET_ALL_BUTTON_OPTIONS } from "../../common/StereochemistryButtonOptions.js";
+import StereochemistryColors from "../../StereochemistryColors.js";
+import { SCREEN_VIEW_MARGIN } from "../../StereochemistryConstants.js";
+import type { ConformationsModel } from "../model/ConformationsModel.js";
+import { ConformationsScreenSummaryContent } from "./ConformationsScreenSummaryContent.js";
+
+export type ConformationsScreenViewOptions = ScreenViewOptions;
+
+export class ConformationsScreenView extends ScreenView {
+  public constructor(model: ConformationsModel, providedOptions?: ConformationsScreenViewOptions) {
+    // ── Accessibility: screen summary ───────────────────────────────────────────
+    // The screen summary is the first thing a screen-reader user encounters. It
+    // is registered here, in the ScreenView's super() options, so every sim wires
+    // it the same way. See ConformationsScreenSummaryContent for the four content regions.
+    const options = optionize<ConformationsScreenViewOptions, EmptySelfOptions, ScreenViewOptions>()(
+      {
+        screenSummaryContent: new ConformationsScreenSummaryContent(model),
+      },
+      providedOptions,
+    );
+    super(options);
+
+    // ── Background ────────────────────────────────────────────────────────────
+    // A full-screen rectangle that follows the active color profile.
+    // Replace or remove once you add real content.
+    const backgroundRect = new Rectangle(0, 0, this.layoutBounds.width, this.layoutBounds.height, {
+      fill: StereochemistryColors.backgroundColorProperty,
+    });
+    this.addChild(backgroundRect);
+
+    // ── Accessibility: per-control names ────────────────────────────────────────
+    // EVERY interactive node must carry an `accessibleName` (and an
+    // `accessibleHelpText` where useful), sourced from the StringManager `a11y`
+    // string group — never a hard-coded English literal. Sun/scenery-phet controls
+    // (NumberControl, Checkbox, ComboBox, AquaRadioButtonGroup, …) accept it as an
+    // option; a draggable plain Node needs `tagName: "div", focusable: true` too.
+    // Example (uncomment and adapt when you add a real control; add the
+    // `a11y.controls.startButton` string to every strings_*.json first):
+    //
+    //   const a11y = StringManager.getInstance().getA11yStrings();
+    //   const startButton = new RectangularPushButton({
+    //     ...FLAT_RECTANGULAR_BUTTON_OPTIONS, // flat appearance, not SceneryStack's default 3-D look
+    //     content: someIcon,
+    //     listener: () => model.start(),
+    //     accessibleName: a11y.controls.startButtonStringProperty,
+    //   });
+    //   this.addChild(startButton);
+
+    // ── Reset All button ──────────────────────────────────────────────────────
+    // Always position at bottom-right (PhET convention).
+    const resetAllButton = new ResetAllButton({
+      ...FLAT_RESET_ALL_BUTTON_OPTIONS,
+      listener: () => {
+        model.reset();
+        this.reset();
+      },
+      right: this.layoutBounds.maxX - SCREEN_VIEW_MARGIN,
+      bottom: this.layoutBounds.maxY - SCREEN_VIEW_MARGIN,
+    });
+    this.addChild(resetAllButton);
+
+    // ── Accessibility: keyboard / reading traversal order ───────────────────────
+    // Make the parallel DOM (Tab order and screen-reader reading order)
+    // deterministic and independent of child z-order. ScreenView throws if you
+    // set pdomOrder on itself, so add a lightweight wrapper Node that "borrows"
+    // the interactive nodes in the order a user should reach them — Reset All
+    // last. Non-interactive decoration (background, placeholder) is omitted.
+    this.addChild(
+      new Node({
+        pdomOrder: [
+          // TODO: add the sim's interactive nodes here, in traversal order
+          resetAllButton,
+        ],
+      }),
+    );
+  }
+
+  /**
+   * Resets view-side state (animations, panel visibility, etc.).
+   * Called by the Reset All button listener.
+   */
+  public reset(): void {
+    // TODO: reset any view-side state here
+  }
+
+  /**
+   * Steps the view forward by dt seconds for animation.
+   * @param _dt - elapsed time in seconds
+   */
+  public override step(_dt: number): void {
+    // TODO: implement animation updates here
+  }
+
+  // ── Accessibility / listeners: dispose ─────────────────────────────────────
+  // ScreenView is `isDisposable: false` and lives for the whole sim, so this
+  // class rarely needs dispose(). Child Nodes (and a live currentDetails
+  // DerivedProperty you own on a short-lived object) do. When you add
+  // DerivedProperty / Multilink / Property.link against model state, keep the
+  // references and tear them down — forks copy what they see. Pattern:
+  //
+  // private readonly disposeConformationsScreenView: () => void;
+  //
+  // // in the constructor, after creating the listeners:
+  // const statusMultilink = Multilink.multilink(
+  //   [model.someProperty, model.otherProperty],
+  //   (a, b) => { /* update view from model */ },
+  // );
+  // const detailsProperty = new DerivedProperty(
+  //   [model.stateProperty],
+  //   (state) => `State: ${state}`,
+  // ); // → pass as currentDetailsContent in ConformationsScreenSummaryContent
+  // const onExternal = (v: number) => { /* … */ };
+  // model.externalProperty.link(onExternal); // Property you do NOT own
+  //
+  // this.disposeConformationsScreenView = () => {
+  //   statusMultilink.dispose();                 // Multilink you created
+  //   detailsProperty.dispose();                 // DerivedProperty you created
+  //   model.externalProperty.unlink(onExternal); // undo external link
+  // };
+  //
+  // public override dispose(): void {
+  //   this.disposeConformationsScreenView();
+  //   super.dispose();
+  // }
+}

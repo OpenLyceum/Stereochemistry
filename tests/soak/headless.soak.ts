@@ -12,15 +12,21 @@
 
 import { StringProperty } from "scenerystack/axon";
 import { Tandem } from "scenerystack/tandem";
-// seed:soak-imports:start
-import SimColors from "../../src/SimColors.js";
-import { SimScreen } from "../../src/sim-screen/SimScreen.js";
-// seed:soak-imports:end
+import { ChallengeScreen } from "../../src/challenge/ChallengeScreen.js";
+import { ChiralityScreen } from "../../src/chirality/ChiralityScreen.js";
+import { RSScreen } from "../../src/configuration/RSScreen.js";
+import { ConformationsScreen } from "../../src/conformations/ConformationsScreen.js";
+import { CyclohexaneScreen } from "../../src/cyclohexane/CyclohexaneScreen.js";
+import StereochemistryColors from "../../src/StereochemistryColors.js";
 import { describeHeadlessSoak } from "../helpers/headlessSoak.js";
 
 describeHeadlessSoak({
-  // seed:soak-screens:start
-  screens: () => [new SimScreen({ name: new StringProperty("Sim"), tandem: Tandem.OPT_OUT })],
-  tracked: () => ({ SimColors }),
-  // seed:soak-screens:end
+  screens: () => [
+    new ChiralityScreen({ name: new StringProperty("Chirality"), tandem: Tandem.OPT_OUT }),
+    new RSScreen({ name: new StringProperty("R/S"), tandem: Tandem.OPT_OUT }),
+    new ConformationsScreen({ name: new StringProperty("Conformations"), tandem: Tandem.OPT_OUT }),
+    new CyclohexaneScreen({ name: new StringProperty("Cyclohexane"), tandem: Tandem.OPT_OUT }),
+    new ChallengeScreen({ name: new StringProperty("Challenge"), tandem: Tandem.OPT_OUT }),
+  ],
+  tracked: () => ({ StereochemistryColors }),
 });

@@ -9,11 +9,17 @@
  * tests below using forceGC().
  */
 
-// seed:leak-imports:start
-import { TimeModel } from "../src/common/TimeModel.js";
-// seed:leak-imports:end
+import { ChallengeModel } from "../src/challenge/model/ChallengeModel.js";
+import { ChiralityModel } from "../src/chirality/model/ChiralityModel.js";
+import { RSModel } from "../src/configuration/model/RSModel.js";
+import { ConformationsModel } from "../src/conformations/model/ConformationsModel.js";
+import { CyclohexaneModel } from "../src/cyclohexane/model/CyclohexaneModel.js";
 import { describeDisposalLeaks } from "./helpers/memoryLeak.js";
 
-// seed:leak-cases:start
-describeDisposalLeaks([{ name: "TimeModel", create: () => new TimeModel(), idempotentDispose: true }]);
-// seed:leak-cases:end
+describeDisposalLeaks([
+  { name: "ChiralityModel", create: () => new ChiralityModel() },
+  { name: "RSModel", create: () => new RSModel() },
+  { name: "ConformationsModel", create: () => new ConformationsModel() },
+  { name: "CyclohexaneModel", create: () => new CyclohexaneModel() },
+  { name: "ChallengeModel", create: () => new ChallengeModel() },
+]);
