@@ -121,7 +121,8 @@ export class ConformationsModel implements TModel {
   );
   public readonly stereoViewModel = new StereoViewModel(
     buildAtPhi(this.dataProperty.value, this.phiProperty.value),
-    () => this.dataProperty.value.rotation,
+    () => this.dataProperty.value.rotation.rotatedAboutScreenAxis([1, 0, 0], SETTINGS.DEFAULT_VIEW_TILT),
+    this.dataProperty.value.rotation,
   );
   private readonly geometryLink = Multilink.lazyMultilink([this.dataProperty, this.phiProperty], (data, phi) => {
     this.stereoViewModel.builtProperty.value = buildAtPhi(data, phi);
@@ -130,7 +131,8 @@ export class ConformationsModel implements TModel {
     this.phiProperty.value = this.specProperty.value.defaultPhi;
     this.stereoViewModel.pickedAtomProperty.reset();
     this.stereoViewModel.hoveredAtomProperty.reset();
-    this.stereoViewModel.resetView();
+    // Seed the camera from the same end-on frame that defines the Newman projection.
+    this.stereoViewModel.resetView(this.dataProperty.value.rotation);
   };
 
   public constructor() {

@@ -101,6 +101,14 @@ export class StringManager {
     return stringProperties.stereo;
   }
 
+  public getChiralityStrings() {
+    return stringProperties.chirality;
+  }
+
+  public getRSStrings() {
+    return stringProperties.configuration;
+  }
+
   public getStereoA11yStrings() {
     return stringProperties.a11y.stereo;
   }

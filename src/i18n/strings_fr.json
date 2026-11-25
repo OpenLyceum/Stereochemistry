@@ -39,19 +39,22 @@
   "a11y": {
     "chirality": {
       "screenSummary": {
-        "playArea": "La zone de jeu affiche le contenu principal de la simulation.",
-        "controlArea": "La zone de contrôle comporte un bouton Tout réinitialiser qui ramène la simulation à son état initial.",
-        "interactionHint": "Explorez la simulation en interagissant avec ses commandes."
+        "playArea": "Une molécule orientable et son image miroir se trouvent de part et d’autre du plan miroir.",
+        "controlArea": "Choisissez une molécule, marquez ses centres stéréogènes, échangez deux groupes ou superposez son image miroir.",
+        "interactionHint": "Essayez Superposer pour comparer les deux structures. Sélectionnez le centre où échanger les groupes."
       },
-      "currentDetails": "La simulation est dans son état initial."
+      "currentDetails": "{{molecule}}. {{count}}. {{chirality}}. {{descriptors}} {{result}}",
+      "viewer": "Molécule originale, vue 3D"
     },
     "configuration": {
       "screenSummary": {
-        "playArea": "La zone de jeu affiche le contenu principal de la simulation.",
-        "controlArea": "La zone de contrôle comporte un bouton Tout réinitialiser qui ramène la simulation à son état initial.",
-        "interactionHint": "Explorez la simulation en interagissant avec ses commandes."
+        "playArea": "Une molécule en 3D, une représentation en coins et une explication des priorités CIP.",
+        "controlArea": "Choisissez une molécule ou un centre stéréogène, orientez la priorité 4 vers l’arrière et répondez R ou S.",
+        "interactionHint": "Orientez la priorité 4 vers l’arrière. Suivez les priorités 1, 2 et 3 pour choisir entre R et S."
       },
-      "currentDetails": "La simulation est dans son état initial."
+      "currentDetails": "{{molecule}}. {{centre}}. {{direction}} {{feedback}}",
+      "priorityDirection": "La priorité 4 pointe vers l’arrière. L’ordre 1, 2, 3 suit le {{direction}}.",
+      "priorityTilted": "La priorité 4 est inclinée ou pointe vers vous."
     },
     "conformations": {
       "currentDetails": "{{molecule}} à {{angle}}. {{energy}}.",
@@ -169,5 +172,45 @@
       "hydroxyl": "Hydroxyle",
       "chloro": "Chloro"
     }
+  },
+  "chirality": {
+    "original": "Original",
+    "mirror": "Image miroir",
+    "superimpose": "Superposer",
+    "separate": "Séparer",
+    "swap": "Échanger deux groupes",
+    "showStereocentres": "Afficher les centres stéréogènes",
+    "showMirror": "Afficher l’image miroir",
+    "chiral": "Chirale",
+    "achiral": "Achirale",
+    "centreCount": "Centres stéréogènes : {{count}}",
+    "descriptors": "({{descriptors}})",
+    "meso": "({{descriptors}}) — méso",
+    "match": "Superposable — achirale",
+    "mismatch": "Non superposable — chirale",
+    "centreMark": "*"
+  },
+  "configuration": {
+    "nextCentre": "Centre stéréogène suivant",
+    "showPriorities": "Afficher les priorités",
+    "orientLowest": "Orienter la priorité 4 vers l’arrière",
+    "centre": "Centre stéréogène {{index}}",
+    "noCentre": "Cette molécule n’a pas de centre stéréogène.",
+    "drawing": "Représentation en coins",
+    "trace": "Priorités CIP",
+    "sphere": "Sphère {{number}} : {{comparison}}",
+    "ligandComparison": "{{sets}} → {{ligands}}",
+    "ethyl": "éthyle",
+    "methyl": "méthyle",
+    "priority": "priorité {{number}}",
+    "clockwise": "Sens horaire",
+    "counterclockwise": "Sens antihoraire",
+    "question": "Attribuer la configuration",
+    "r": "R",
+    "s": "S",
+    "correct": "Bonne réponse : ({{descriptor}})-{{molecule}}",
+    "correctCentre": "Bonne réponse : le centre {{index}} est {{descriptor}}.",
+    "toward": "Pas tout à fait. La priorité 4 pointe vers vous : inversez le sens.",
+    "tryAway": "Pas tout à fait. Orientez la priorité 4 vers l’arrière et suivez 1 → 2 → 3."
   }
 }

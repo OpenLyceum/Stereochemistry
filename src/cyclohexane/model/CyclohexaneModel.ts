@@ -51,7 +51,8 @@ export class CyclohexaneModel implements TModel {
     }),
   );
   public readonly stereoViewModel = new StereoViewModel(this.ringProperty.value, () =>
-    Rotation3.aboutAxis([1, 0, 0], SETTINGS.TILT).rotatedAboutScreenAxis([0, 0, 1], SETTINGS.ROLL),
+    // The ring mean plane is xy, with C1–C4 along x in that plane.
+    new Rotation3([1, 0, 0, 0, 0, 1, 0, -1, 0]).rotatedAboutScreenAxis([1, 0, 0], SETTINGS.VIEW_TILT),
   );
   private target = 0;
 

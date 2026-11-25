@@ -119,6 +119,7 @@ type RenderInput = {
   readonly picked: number | null;
   readonly pendingPicks: readonly number[];
   readonly measurements: readonly Measurement[];
+  readonly measurementLabelOffsetX?: number;
   readonly measurementLabel: (measurement: Measurement) => string;
   readonly axisLabels: readonly [string, string, string];
   readonly cellLabels: readonly [string, string, string, string];
@@ -891,7 +892,7 @@ export class MoleculeRenderer {
     const mid = measurementLabelPoint(pts);
     ctx.fillText(
       input.measurementLabel(measurement),
-      mid[0] + APPEARANCE.MEASUREMENT_LABEL_OFFSET_X,
+      mid[0] + (input.measurementLabelOffsetX ?? APPEARANCE.MEASUREMENT_LABEL_OFFSET_X),
       mid[1] + APPEARANCE.MEASUREMENT_LABEL_OFFSET_Y,
     );
   }

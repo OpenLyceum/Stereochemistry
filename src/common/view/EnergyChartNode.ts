@@ -73,7 +73,10 @@ export class EnergyChartNode extends Node {
     const readout = new Text(patternProperty.value, { ...labelOptions, fill: colors.chairMarkerColorProperty });
     const landmarks = options.namedPoints.map(({ x, label }) => ({
       x,
-      text: new Text(label, { ...tickOptions, maxWidth: SETTINGS.CHART_LANDMARK_MAX_WIDTH }),
+      text: new Text(label, {
+        ...tickOptions,
+        maxWidth: Math.min(SETTINGS.CHART_LANDMARK_MAX_WIDTH, width - 2 * SETTINGS.CHART_EDGE_INSET),
+      }),
     }));
     const children = [
       background,
@@ -125,8 +128,10 @@ export class EnergyChartNode extends Node {
       const curve = options.curveProperty.value;
       for (const { x: landmarkX, text } of landmarks) {
         const point = transform.modelToViewXY(landmarkX, sample(curve, landmarkX));
-        text.centerX = clamp(point.x, text.width / 2, width - text.width / 2);
-        text.bottom = Math.max(text.height + SETTINGS.CHART_LABEL_GAP, point.y - SETTINGS.CHART_LABEL_GAP);
+        const inset = SETTINGS.CHART_EDGE_INSET;
+        const halfWidth = text.width / 2;
+        text.centerX = clamp(point.x, inset + halfWidth, width - inset - halfWidth);
+        text.bottom = clamp(point.y - SETTINGS.CHART_LABEL_GAP, inset + text.height, height - inset);
       }
     };
     const markerLink = Multilink.multilink(

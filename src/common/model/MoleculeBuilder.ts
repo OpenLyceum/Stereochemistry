@@ -325,6 +325,11 @@ export function buildMolecule(spec: MoleculeSpec): BuiltMolecule {
 /** Reflect the current coordinates in the yz plane without mutating the original. */
 export function mirror(built: BuiltMolecule): BuiltMolecule {
   const positions = built.positions.map((coordinate, i) => (i % 3 === 0 ? -coordinate : coordinate));
+  return withPositions(built, positions);
+}
+
+/** Update coordinates while preserving the molecular graph and its active frame. */
+export function withPositions(built: BuiltMolecule, positions: Float64Array): BuiltMolecule {
   const { structure } = built;
   return {
     ...built,
@@ -336,7 +341,10 @@ export function mirror(built: BuiltMolecule): BuiltMolecule {
   };
 }
 
-/** Swapping two distinct groups inverts the centre's prescribed configuration. */
+/**
+ * Swapping two distinct groups inverts a specification's prescribed configuration.
+ * @public
+ */
 export function swapSubstituents(spec: MoleculeSpec, centre: number, i: number, j: number): MoleculeSpec {
   if (i === j || !spec.stereo?.some((entry) => entry.centre === centre)) {
     return spec;

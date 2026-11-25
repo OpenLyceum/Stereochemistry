@@ -10,7 +10,7 @@ import { StringManager } from "../../i18n/StringManager.js";
 import { StereochemistryHotkeyData, VIEWER_HOTKEYS } from "../../StereochemistryHotkeyData.js";
 
 export class StereoKeyboardHelpContent extends TwoColumnKeyboardHelpContent {
-  public constructor(withNewman: boolean) {
+  public constructor(withNewman: boolean, withSliders = true) {
     const a11y = StringManager.getInstance().getStereoA11yStrings();
     const viewer = new KeyboardHelpSection(
       a11y.viewerShortcutsStringProperty,
@@ -25,7 +25,7 @@ export class StereoKeyboardHelpContent extends TwoColumnKeyboardHelpContent {
         return KeyboardHelpSectionRow.fromHotkeyData(hotkey, symbol ? { icon: new TextKeyNode(symbol) } : undefined);
       }),
     );
-    const sliders = new SliderControlsKeyboardHelpSection();
+    const sliders = withSliders ? [new SliderControlsKeyboardHelpSection()] : [];
     const projection = withNewman
       ? [
           new KeyboardHelpSection(
@@ -36,6 +36,6 @@ export class StereoKeyboardHelpContent extends TwoColumnKeyboardHelpContent {
           ),
         ]
       : [];
-    super([viewer], [...projection, sliders, new BasicActionsKeyboardHelpSection({ withCheckboxContent: true })]);
+    super([viewer], [...projection, ...sliders, new BasicActionsKeyboardHelpSection({ withCheckboxContent: true })]);
   }
 }

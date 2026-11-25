@@ -74,9 +74,15 @@ function constitutionalKeys(structure: Structure, graph: Adjacency): string[] {
 }
 
 /** Try descriptor-preserving permutations within equivalent constitutional environments. */
-function equivalent(a: Structure, b: Structure, labelsA: ConfigurationMap, labelsB: ConfigurationMap): boolean {
+function matchingPermutation(
+  a: Structure,
+  b: Structure,
+  labelsA: ConfigurationMap,
+  labelsB: ConfigurationMap,
+  score?: (permutation: readonly number[]) => number,
+): number[] | null {
   if (a.atoms.length !== b.atoms.length || a.bonds.length !== b.bonds.length || labelsA.size !== labelsB.size) {
-    return false;
+    return null;
   }
   const graphA = adjacency(a);
   const graphB = adjacency(b);
@@ -94,10 +100,18 @@ function equivalent(a: Structure, b: Structure, labelsA: ConfigurationMap, label
 
   const assigned = new Map<number, number>();
   const used = new Set<number>();
+  let best: number[] | null = null;
+  let bestScore = Infinity;
   function match(depth: number): boolean {
     const slot = slots[depth];
     if (!slot) {
-      return true;
+      const permutation = a.atoms.map((_, index) => assigned.get(index) ?? index);
+      const value = score?.(permutation) ?? 0;
+      if (value < bestScore) {
+        best = permutation;
+        bestScore = value;
+      }
+      return !score;
     }
     for (const candidate of slot.candidates) {
       if (used.has(candidate)) {
@@ -122,7 +136,27 @@ function equivalent(a: Structure, b: Structure, labelsA: ConfigurationMap, label
     }
     return false;
   }
-  return match(0);
+  match(0);
+  return best;
+}
+
+function equivalent(a: Structure, b: Structure, labelsA: ConfigurationMap, labelsB: ConfigurationMap): boolean {
+  return matchingPermutation(a, b, labelsA, labelsB) !== null;
+}
+
+/** Match descriptors and choose the correspondence with the lowest alignment error. */
+export function mirrorAtomPermutation(
+  original: BuiltMolecule,
+  reflected: BuiltMolecule,
+  score: (permutation: readonly number[]) => number,
+): number[] | null {
+  return matchingPermutation(
+    original.structure,
+    reflected.structure,
+    descriptors(original),
+    descriptors(reflected),
+    score,
+  );
 }
 
 export function isChiral(built: BuiltMolecule): boolean {
@@ -130,6 +164,10 @@ export function isChiral(built: BuiltMolecule): boolean {
   return labels.size > 0 && !equivalent(built.structure, built.structure, labels, invert(labels));
 }
 
+/**
+ * Classify the stereoisomer relationship between molecules of the same constitution.
+ * @public
+ */
 export function relationship(
   a: BuiltMolecule,
   b: BuiltMolecule,

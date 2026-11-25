@@ -116,6 +116,30 @@ const StereochemistryColors = {
     default: "#39476b",
     projector: "#d8dee6",
   }),
+  mirrorPlaneColorProperty: new ProfileColorProperty(StereochemistryNamespace, "mirrorPlane", {
+    default: "#7585aa",
+    projector: "#657086",
+  }),
+  cipPriority1ColorProperty: new ProfileColorProperty(StereochemistryNamespace, "cipPriority1", {
+    default: "#f7808d",
+    projector: "#b51f47",
+  }),
+  cipPriority2ColorProperty: new ProfileColorProperty(StereochemistryNamespace, "cipPriority2", {
+    default: "#f5c168",
+    projector: "#9b5a00",
+  }),
+  cipPriority3ColorProperty: new ProfileColorProperty(StereochemistryNamespace, "cipPriority3", {
+    default: "#66ddc0",
+    projector: "#067769",
+  }),
+  cipPriority4ColorProperty: new ProfileColorProperty(StereochemistryNamespace, "cipPriority4", {
+    default: "#9bb4ff",
+    projector: "#3a51a5",
+  }),
+  cipArrowColorProperty: new ProfileColorProperty(StereochemistryNamespace, "cipArrow", {
+    default: "#ffe19b",
+    projector: "#824600",
+  }),
   axialColorProperty: new ProfileColorProperty(StereochemistryNamespace, "axial", {
     default: "#f5a85d",
     projector: "#a64213",

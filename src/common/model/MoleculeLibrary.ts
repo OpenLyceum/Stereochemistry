@@ -226,3 +226,6 @@ export const CYCLOHEXANE_LIBRARY = [
     { carbon: 3, face: "down", group: "CH3" },
   ]),
 ] as const;
+
+/** Acyclic presets shared by the Chirality and R/S screens. */
+export const CHIRALITY_MOLECULES = MOLECULE_LIBRARY.filter(({ family }) => family === "chirality");

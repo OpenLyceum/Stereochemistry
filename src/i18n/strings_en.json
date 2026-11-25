@@ -39,19 +39,22 @@
   "a11y": {
     "chirality": {
       "screenSummary": {
-        "playArea": "The play area shows the main simulation content.",
-        "controlArea": "The control area has a Reset All button that returns the simulation to its starting state.",
-        "interactionHint": "Explore the simulation by interacting with its controls."
+        "playArea": "A rotatable molecule and its mirror image appear on either side of a mirror plane.",
+        "controlArea": "Choose a molecule, mark stereocentres, exchange two groups, or superimpose the mirror image.",
+        "interactionHint": "Try Superimpose to compare the two structures. Select a stereocentre to choose where to swap groups."
       },
-      "currentDetails": "The simulation is in its initial state."
+      "currentDetails": "{{molecule}}. {{count}}. {{chirality}}. {{descriptors}} {{result}}",
+      "viewer": "Original molecule, 3D viewer"
     },
     "configuration": {
       "screenSummary": {
-        "playArea": "The play area shows the main simulation content.",
-        "controlArea": "The control area has a Reset All button that returns the simulation to its starting state.",
-        "interactionHint": "Explore the simulation by interacting with its controls."
+        "playArea": "A 3D molecule, a wedge–dash drawing, and an explanation of CIP priorities.",
+        "controlArea": "Choose a molecule or stereocentre, orient priority 4 away, and answer R or S.",
+        "interactionHint": "Turn priority 4 away. Follow priorities 1, 2, and 3 to decide between R and S."
       },
-      "currentDetails": "The simulation is in its initial state."
+      "currentDetails": "{{molecule}}. {{centre}}. {{direction}} {{feedback}}",
+      "priorityDirection": "Priority 4 is pointing away. The order 1, 2, 3 is {{direction}}.",
+      "priorityTilted": "Priority 4 is tilted or pointing toward you."
     },
     "conformations": {
       "currentDetails": "{{molecule}} at {{angle}}. {{energy}}.",
@@ -169,5 +172,45 @@
       "hydroxyl": "Hydroxyl",
       "chloro": "Chloro"
     }
+  },
+  "chirality": {
+    "original": "Original",
+    "mirror": "Mirror image",
+    "superimpose": "Superimpose",
+    "separate": "Separate",
+    "swap": "Swap two groups",
+    "showStereocentres": "Show stereocentres",
+    "showMirror": "Show mirror image",
+    "chiral": "Chiral",
+    "achiral": "Achiral",
+    "centreCount": "Stereocentres: {{count}}",
+    "descriptors": "({{descriptors}})",
+    "meso": "({{descriptors}}) — meso",
+    "match": "Superimposable — achiral",
+    "mismatch": "Not superimposable — chiral",
+    "centreMark": "*"
+  },
+  "configuration": {
+    "nextCentre": "Next stereocentre",
+    "showPriorities": "Show priorities",
+    "orientLowest": "Turn priority 4 away",
+    "centre": "Stereocentre {{index}}",
+    "noCentre": "This molecule has no stereocentre.",
+    "drawing": "Wedge–dash drawing",
+    "trace": "CIP priorities",
+    "sphere": "Sphere {{number}}: {{comparison}}",
+    "ligandComparison": "{{sets}} → {{ligands}}",
+    "ethyl": "ethyl",
+    "methyl": "methyl",
+    "priority": "priority {{number}}",
+    "clockwise": "Clockwise",
+    "counterclockwise": "Counterclockwise",
+    "question": "Assign the configuration",
+    "r": "R",
+    "s": "S",
+    "correct": "Correct: ({{descriptor}})-{{molecule}}",
+    "correctCentre": "Correct: stereocentre {{index}} is {{descriptor}}.",
+    "toward": "Not quite — priority 4 is pointing toward you, so reverse the direction.",
+    "tryAway": "Not quite — turn priority 4 away and follow 1 → 2 → 3."
   }
 }

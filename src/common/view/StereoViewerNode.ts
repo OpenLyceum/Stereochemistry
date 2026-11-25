@@ -15,7 +15,10 @@ import {
 import { PhetFont } from "scenerystack/scenery-phet";
 import { StringManager } from "../../i18n/StringManager.js";
 import StereochemistryColors from "../../StereochemistryColors.js";
-import { STEREO_VIEWER_SETTINGS as SETTINGS } from "../../StereochemistryConstants.js";
+import {
+  MOLECULE_RENDERER_APPEARANCE_SETTINGS,
+  STEREO_VIEWER_SETTINGS as SETTINGS,
+} from "../../StereochemistryConstants.js";
 import { VIEWER_HOTKEYS } from "../../StereochemistryHotkeyData.js";
 import { type BuiltMolecule, positionAt } from "../model/MoleculeGraph.js";
 import { findStereocentres } from "../model/Stereocentres.js";
@@ -28,12 +31,16 @@ import { MoleculeRenderer } from "./MoleculeRenderer.js";
 
 type StereoViewerOptions = {
   measurementsProperty?: TReadOnlyProperty<readonly Measurement[]>;
+  measurementLabelOffsetX?: number;
   measurementLabelProperty?: TReadOnlyProperty<string>;
   appearanceDependencies?: readonly TReadOnlyProperty<unknown>[];
   atomColor?: (index: number) => number | undefined;
   bondColor?: (a: number, b: number) => number | undefined;
   canPick?: (index: number) => boolean;
   center?: (built: BuiltMolecule) => Vec3;
+  fitMolecule?: () => BuiltMolecule;
+  interactive?: boolean;
+  accessibleName?: TReadOnlyProperty<string>;
   helpText?: TReadOnlyProperty<string>;
 };
 
@@ -49,6 +56,25 @@ function centroid(built: BuiltMolecule): Vec3 {
     sum[2] += z;
   }
   return [sum[0] / count, sum[1] / count, sum[2] / count];
+}
+
+function framing(
+  built: BuiltMolecule,
+  options: StereoViewerOptions,
+  display?: DisplayState,
+): { center: Vec3; radius: number } {
+  const center = options.center?.(built) ?? centroid(built);
+  const fit = options.fitMolecule?.() ?? built;
+  const state = display ?? new DisplayState(fit.structure);
+  if (!display) {
+    state.applyStyle("ballAndStick");
+  }
+  let radius = 0;
+  for (let index = 0; index < state.atomCount; index++) {
+    const [x, y, z] = positionAt(fit.positions, index);
+    radius = Math.max(radius, Math.hypot(x - center[0], y - center[1], z - center[2]) + (state.atomRadius[index] ?? 0));
+  }
+  return { center, radius };
 }
 
 class StereoCanvasNode extends CanvasNode {
@@ -83,15 +109,7 @@ class StereoCanvasNode extends CanvasNode {
       state.selected[index] = 1;
     }
 
-    const center = this.options.center?.(built) ?? centroid(built);
-    let radius = 0;
-    for (let index = 0; index < state.atomCount; index++) {
-      const [x, y, z] = positionAt(positions, index);
-      radius = Math.max(
-        radius,
-        Math.hypot(x - center[0], y - center[1], z - center[2]) + (state.atomRadius[index] ?? 0),
-      );
-    }
+    const { center, radius } = framing(built, this.options, state);
     const { width, height, minX, minY } = this.canvasBounds;
     const text = StereochemistryColors.textColorProperty.value.toCSS();
     const { options } = this;
@@ -119,6 +137,9 @@ class StereoCanvasNode extends CanvasNode {
       picked: model.pickedAtomProperty.value,
       pendingPicks: [],
       measurements: options.measurementsProperty?.value ?? [],
+      ...(options.measurementLabelOffsetX !== undefined
+        ? { measurementLabelOffsetX: options.measurementLabelOffsetX }
+        : {}),
       measurementLabel: () => options.measurementLabelProperty?.value ?? "",
       axisLabels: ["", "", ""],
       cellLabels: ["", "", "", ""],
@@ -143,18 +164,24 @@ class StereoCanvasNode extends CanvasNode {
 
 export class StereoViewerNode extends Node {
   private readonly disposeViewer: () => void;
+  private readonly projectAtomsInViewport: (indices: readonly number[]) => Vector2[];
 
   public constructor(model: StereoViewModel, bounds: Bounds2, options: StereoViewerOptions = {}) {
     const a11y = StringManager.getInstance().getStereoA11yStrings();
     const canvas = new StereoCanvasNode(model, bounds, options);
     const hitArea = new Rectangle(bounds, { fill: Color.TRANSPARENT, cursor: "grab" });
+    const interactive = options.interactive ?? true;
     super({
-      children: [canvas, hitArea],
-      tagName: "div",
-      ariaRole: "application",
-      focusable: true,
-      accessibleName: a11y.viewerStringProperty,
-      accessibleHelpText: options.helpText ?? a11y.viewerHelpStringProperty,
+      children: interactive ? [canvas, hitArea] : [canvas],
+      ...(interactive
+        ? {
+            tagName: "div",
+            ariaRole: "application",
+            focusable: true,
+            accessibleName: options.accessibleName ?? a11y.viewerStringProperty,
+            accessibleHelpText: options.helpText ?? a11y.viewerHelpStringProperty,
+          }
+        : { pickable: false }),
     });
 
     const invalidate = () => canvas.invalidatePaint();
@@ -179,6 +206,32 @@ export class StereoViewerNode extends Node {
     ];
     for (const property of appearanceDependencies) {
       property?.lazyLink(invalidate);
+    }
+
+    this.projectAtomsInViewport = (indices) => {
+      const built = model.builtProperty.value;
+      const { center, radius } = framing(built, options);
+      const scale =
+        (model.zoomProperty.value * Math.min(bounds.width, bounds.height)) /
+        (2 * radius * MOLECULE_RENDERER_APPEARANCE_SETTINGS.FIT_RADIUS_FACTOR);
+      return indices.map((index) => {
+        const [x, y, z] = positionAt(built.positions, index);
+        const point = model.rotationProperty.value.apply(x - center[0], y - center[1], z - center[2], [0, 0, 0]);
+        return new Vector2(bounds.centerX + point[0] * scale, bounds.centerY - point[1] * scale);
+      });
+    };
+
+    const disposePainting = () => {
+      repaint.dispose();
+      for (const property of appearanceDependencies) {
+        property?.unlink(invalidate);
+      }
+      canvas.dispose();
+      hitArea.dispose();
+    };
+    if (!interactive) {
+      this.disposeViewer = disposePainting;
+      return;
     }
 
     const accepts = (index: number) =>
@@ -336,19 +389,19 @@ export class StereoViewerNode extends Node {
     this.addInputListener(keyboard);
 
     this.disposeViewer = () => {
-      repaint.dispose();
-      for (const property of appearanceDependencies) {
-        property?.unlink(invalidate);
-      }
       model.pickedAtomProperty.unlink(clearCursor);
       hitArea.removeInputListener(press);
       hitArea.removeInputListener(hover);
       this.removeInputListener(keyboard);
       press.dispose();
       keyboard.dispose();
-      canvas.dispose();
-      hitArea.dispose();
+      disposePainting();
     };
+  }
+
+  /** Project an atom in the same coordinates as the orthographic canvas. */
+  public projectAtoms(indices: readonly number[]): Vector2[] {
+    return this.projectAtomsInViewport(indices);
   }
 
   public override dispose(): void {

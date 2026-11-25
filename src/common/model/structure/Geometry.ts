@@ -35,7 +35,10 @@ export function distance(a: Vec3, b: Vec3): number {
   return Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 }
 
-/** Angle a–b–c at vertex b, degrees. */
+/**
+ * Angle a–b–c at vertex b in degrees, used to verify generated bond geometry.
+ * @internal
+ */
 export function angle(a: Vec3, b: Vec3, c: Vec3): number {
   const u = normalize(subtract(a, b));
   const v = normalize(subtract(c, b));

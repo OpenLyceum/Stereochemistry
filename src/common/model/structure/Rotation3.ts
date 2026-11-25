@@ -7,6 +7,7 @@
  * axis fixed to the screen — the trackball behaviour users expect from Jmol.
  */
 
+import { Matrix3, Quaternion, Vector3 } from "scenerystack/dot";
 import type { Vec3 } from "./Geometry.js";
 
 export class Rotation3 {
@@ -37,6 +38,42 @@ export class Rotation3 {
       z * y * k + x * s,
       c + z * z * k,
     ]);
+  }
+
+  /** Shortest rotation carrying one unit vector to another, including antiparallel vectors. */
+  public static between(from: Vec3, to: Vec3): Rotation3 {
+    return Rotation3.fromMatrix(Matrix3.rotateAToB(new Vector3(...from), new Vector3(...to)));
+  }
+
+  /** Follow the shorter spherical path between two orientations. */
+  public slerp(target: Rotation3, progress: number): Rotation3 {
+    return Rotation3.fromMatrix(
+      Quaternion.slerp(this.toQuaternion(), target.toQuaternion(), progress).normalized().toRotationMatrix(),
+    );
+  }
+
+  /** Conjugation by an x reflection preserves a reflected pair as the camera turns. */
+  public reflectedAcrossX(): Rotation3 {
+    return new Rotation3(this.m.map((value, i) => (i < 3 !== (i % 3 === 0) ? -value : value)));
+  }
+
+  private static fromMatrix(matrix: Matrix3): Rotation3 {
+    return new Rotation3([
+      matrix.m00(),
+      matrix.m01(),
+      matrix.m02(),
+      matrix.m10(),
+      matrix.m11(),
+      matrix.m12(),
+      matrix.m20(),
+      matrix.m21(),
+      matrix.m22(),
+    ]);
+  }
+
+  private toQuaternion(): Quaternion {
+    const [a = 1, b = 0, c = 0, d = 0, e = 1, f = 0, g = 0, h = 0, i = 1] = this.m;
+    return Quaternion.fromRotationMatrix(new Matrix3().rowMajor(a, b, c, d, e, f, g, h, i));
   }
 
   /** this × other (apply `other` first). */

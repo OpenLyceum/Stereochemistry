@@ -16,10 +16,14 @@ export class StereoViewModel {
 
   private readonly defaultRotation: () => Rotation3;
 
-  public constructor(built: BuiltMolecule, defaultRotation: () => Rotation3 = () => Rotation3.IDENTITY) {
+  public constructor(
+    built: BuiltMolecule,
+    defaultRotation: () => Rotation3 = () => Rotation3.IDENTITY,
+    initialRotation = defaultRotation(),
+  ) {
     this.defaultRotation = defaultRotation;
     this.builtProperty = new Property(built);
-    this.rotationProperty = new Property(defaultRotation());
+    this.rotationProperty = new Property(initialRotation);
   }
 
   public rotate(axis: Vec3, degrees: number): void {
@@ -33,8 +37,8 @@ export class StereoViewModel {
     );
   }
 
-  public resetView(): void {
-    this.rotationProperty.value = this.defaultRotation();
+  public resetView(rotation = this.defaultRotation()): void {
+    this.rotationProperty.value = rotation;
     this.zoomProperty.reset();
   }
 

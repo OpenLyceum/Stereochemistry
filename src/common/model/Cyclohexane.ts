@@ -10,6 +10,10 @@ import { type Adjacency, adjacency, positionAt } from "./MoleculeGraph.js";
 import type { BondSpec, HeavyAtomSpec } from "./MoleculeSpec.js";
 import { cross, normalize, subtract, type Vec3 } from "./structure/Geometry.js";
 
+/**
+ * Reference A-values exposed for direct comparison with chair-strain calculations in tests.
+ * @internal
+ */
 export const A_VALUES = SETTINGS.A_VALUES;
 type Group = keyof typeof A_VALUES;
 type Face = "up" | "down";

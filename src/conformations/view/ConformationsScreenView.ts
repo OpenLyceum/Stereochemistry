@@ -65,6 +65,7 @@ export class ConformationsScreenView extends ScreenView {
       {
         measurementsProperty: model.measurementProperty,
         measurementLabelProperty: angleText,
+        measurementLabelOffsetX: SETTINGS.MEASUREMENT_LABEL_OFFSET_X,
         center: ({ positions }): Vec3 => {
           const [measurement] = model.measurementProperty.value;
           const front = positionAt(positions, measurement?.atoms[1] ?? 0);
@@ -73,6 +74,7 @@ export class ConformationsScreenView extends ScreenView {
         },
       },
     );
+    model.moleculeProperty.link(() => model.stereoViewModel.resetView());
     const resetView = stereoButton(sharedA11y.resetViewStringProperty, () => model.stereoViewModel.resetView());
     const newman = new NewmanProjectionNode(model.newmanProperty, model.phiProperty);
     const chart = new EnergyChartNode({

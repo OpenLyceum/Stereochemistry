@@ -1,14 +1,4 @@
-/**
- * ChiralityScreen.ts
- *
- * The top-level Screen component. It wires together the model and view
- * factories and passes screen-level options (name, background color, tandem)
- * to the parent Screen class.
- *
- * Registered in the screens array in src/main.ts. Its home-screen and navigation-bar
- * icons come from createChiralityIcon() in src/common/StereochemistryScreenIcons.ts
- * (see doc/multi-screen.md).
- */
+/** Wires the stereochemistry model, view, icon, and keyboard help into the sim. */
 import { type EmptySelfOptions, optionize } from "scenerystack/phet-core";
 import type { ScreenOptions } from "scenerystack/sim";
 import { Screen } from "scenerystack/sim";

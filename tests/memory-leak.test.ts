@@ -17,12 +17,15 @@ import { StereoViewModel } from "../src/common/model/StereoViewModel.js";
 import { EnergyChartNode } from "../src/common/view/EnergyChartNode.js";
 import { NewmanProjectionNode } from "../src/common/view/NewmanProjectionNode.js";
 import { StereoViewerNode } from "../src/common/view/StereoViewerNode.js";
+import { WedgeDashNode } from "../src/common/view/WedgeDashNode.js";
 import { RSModel } from "../src/configuration/model/RSModel.js";
 import { ConformationsModel } from "../src/conformations/model/ConformationsModel.js";
 import { CyclohexaneModel } from "../src/cyclohexane/model/CyclohexaneModel.js";
 import { StringManager } from "../src/i18n/StringManager.js";
 import { describeDisposalLeaks } from "./helpers/memoryLeak.js";
 
+const chirality = new ChiralityModel();
+const configuration = new RSModel();
 const conformations = new ConformationsModel();
 const strings = StringManager.getInstance().getStereoStrings();
 
@@ -37,6 +40,17 @@ describeDisposalLeaks([
     name: "StereoViewerNode",
     create: () => new StereoViewerNode(conformations.stereoViewModel, new Bounds2(0, 0, 300, 300)),
     keepAlive: () => [conformations.stereoViewModel],
+  },
+  {
+    name: "Chirality reflection viewer",
+    create: () => new StereoViewerNode(chirality.mirrorView, new Bounds2(0, 0, 300, 300), { interactive: false }),
+    keepAlive: () => [chirality],
+  },
+  {
+    name: "WedgeDashNode",
+    create: () =>
+      new WedgeDashNode(configuration.stereoViewModel, configuration.centreProperty, new Bounds2(0, 0, 300, 300)),
+    keepAlive: () => [configuration],
   },
   {
     name: "NewmanProjectionNode",

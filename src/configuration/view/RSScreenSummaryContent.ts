@@ -1,40 +1,95 @@
-/**
- * RSScreenSummaryContent.ts
- *
- * The accessible screen summary read by screen readers (SceneryStack's
- * Interactive Description). It appears at the top of the parallel DOM and gives
- * a non-visual user a way to orient themselves and to re-read the simulation's
- * current state at any time.
- *
- * A summary has four regions (all optional, but provide at least the first
- * three in every sim for consistency across OpenLyceum):
- *   - playAreaContent       — what the play area contains
- *   - controlAreaContent    — what the controls do
- *   - currentDetailsContent — a LIVE paragraph describing current state
- *   - interactionHintContent — a short hint on how to get started
- *
- * ── Making "current details" live ─────────────────────────────────────────────
- * The template has no model state, so currentDetails is a static string. In a
- * real sim, build a DerivedProperty over the relevant model Properties and pass
- * it as `currentDetailsContent` so the paragraph updates as the sim runs.
- * See LunarLander/src/.../LunarLanderScreenSummaryContent.ts for the pattern.
- * If that DerivedProperty (or any Multilink) is owned by a short-lived object,
- * dispose it on teardown — see the commented dispose() stub in RSScreenView.
- */
+/** Live R/S readouts shared by the visible view and the screen reader summary. */
+import { DerivedProperty, PatternStringProperty } from "scenerystack/axon";
+import { StringUtils } from "scenerystack/phetcommon";
 import { ScreenSummaryContent } from "scenerystack/sim";
 import { StringManager } from "../../i18n/StringManager.js";
 import type { RSModel } from "../model/RSModel.js";
 
-export class RSScreenSummaryContent extends ScreenSummaryContent {
-  // `model` is unused in the template but kept in the signature so real sims can
-  // derive a live currentDetailsContent from it without changing call sites.
-  public constructor(_model: RSModel) {
-    const a11y = StringManager.getInstance().getRSA11yStrings();
+export function rsReadouts(model: RSModel) {
+  const manager = StringManager.getInstance();
+  const strings = manager.getRSStrings();
+  const a11y = manager.getRSA11yStrings();
+  const names = manager.getMoleculeNames();
+  const nameProperty = DerivedProperty.deriveAny(
+    [model.moleculeProperty, ...Object.values(names)],
+    () => names[`${model.moleculeProperty.value}StringProperty`].value,
+  );
+  const centreTextProperty = new DerivedProperty(
+    [model.centreProperty, strings.centreStringProperty, strings.noCentreStringProperty],
+    (centre, pattern, none) => (centre === null ? none : StringUtils.fillIn(pattern, { index: String(centre + 1) })),
+  );
+  const directionProperty = new DerivedProperty(
+    [
+      model.lowestAwayProperty,
+      model.configurationProperty,
+      strings.clockwiseStringProperty,
+      strings.counterclockwiseStringProperty,
+    ],
+    (away, configuration, clockwise, counterclockwise) =>
+      away && configuration ? (configuration === "R" ? clockwise : counterclockwise) : "",
+  );
+  const currentDirectionProperty = new DerivedProperty(
+    [
+      model.configurationProperty,
+      directionProperty,
+      a11y.priorityDirectionStringProperty,
+      a11y.priorityTiltedStringProperty,
+    ],
+    (configuration, direction, pattern, tilted) =>
+      direction
+        ? StringUtils.fillIn(pattern, { direction: direction.toLocaleLowerCase() })
+        : configuration
+          ? tilted
+          : "",
+  );
+  const feedbackTextProperty = DerivedProperty.deriveAny(
+    [
+      model.feedbackProperty,
+      model.configurationProperty,
+      model.centreProperty,
+      model.stereocentresProperty,
+      model.lowestDirectionProperty,
+      nameProperty,
+      strings.correctStringProperty,
+      strings.correctCentreStringProperty,
+      strings.towardStringProperty,
+      strings.tryAwayStringProperty,
+    ],
+    () => {
+      const feedback = model.feedbackProperty.value;
+      const descriptor = model.configurationProperty.value;
+      const centre = model.centreProperty.value;
+      if (!(feedback && descriptor) || centre === null) {
+        return "";
+      }
+      if (feedback === "incorrect") {
+        return (model.lowestDirectionProperty.value?.[2] ?? 0) > 0
+          ? strings.towardStringProperty.value
+          : strings.tryAwayStringProperty.value;
+      }
+      return model.stereocentresProperty.value.length > 1
+        ? StringUtils.fillIn(strings.correctCentreStringProperty.value, { index: String(centre + 1), descriptor })
+        : StringUtils.fillIn(strings.correctStringProperty.value, {
+            molecule: nameProperty.value.toLocaleLowerCase(),
+            descriptor,
+          });
+    },
+  );
+  return { nameProperty, centreTextProperty, directionProperty, currentDirectionProperty, feedbackTextProperty };
+}
 
+export class RSScreenSummaryContent extends ScreenSummaryContent {
+  public constructor(readouts: ReturnType<typeof rsReadouts>) {
+    const a11y = StringManager.getInstance().getRSA11yStrings();
     super({
       playAreaContent: a11y.screenSummary.playAreaStringProperty,
       controlAreaContent: a11y.screenSummary.controlAreaStringProperty,
-      currentDetailsContent: a11y.currentDetailsStringProperty,
+      currentDetailsContent: new PatternStringProperty(a11y.currentDetailsStringProperty, {
+        molecule: readouts.nameProperty,
+        centre: readouts.centreTextProperty,
+        direction: readouts.currentDirectionProperty,
+        feedback: readouts.feedbackTextProperty,
+      }),
       interactionHintContent: a11y.screenSummary.interactionHintStringProperty,
     });
   }

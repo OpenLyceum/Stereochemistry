@@ -1,151 +1,178 @@
-/**
- * ChiralityScreenView.ts
- *
- * The top-level view for the simulation screen.
- *
- * All visual nodes are added here. Follow these conventions:
- *   - Use this.layoutBounds for positioning (never magic pixel values)
- *   - Keep a ResetAllButton that calls model.reset() and this.reset()
- *   - Override step(dt) for frame-by-frame animation
- *
- * ── Adding content ────────────────────────────────────────────────────────────
- * 1. Create Node subclasses in separate files (e.g. StereochemistryControlPanel.ts)
- * 2. Instantiate them here and call this.addChild(...)
- * 3. Link them to model properties:
- *      model.isRunningProperty.link( isRunning => { ... } );
- *
- * ── Layout bounds ─────────────────────────────────────────────────────────────
- * SceneryStack uses a virtual 1024×618 coordinate space by default.
- * this.layoutBounds gives you the full rectangle; use it for alignment:
- *   center, minX, maxX, minY, maxY, width, height
- */
-
-import { type EmptySelfOptions, optionize } from "scenerystack/phet-core";
-import { Node, Rectangle } from "scenerystack/scenery";
+/** The original and mirror viewers, comparison readouts, and chirality controls. */
+import { Multilink } from "scenerystack/axon";
+import { Bounds2 } from "scenerystack/dot";
+import { HBox, Line, Node, Rectangle, VBox } from "scenerystack/scenery";
 import { ResetAllButton } from "scenerystack/scenery-phet";
 import { ScreenView, type ScreenViewOptions } from "scenerystack/sim";
 import { FLAT_RESET_ALL_BUTTON_OPTIONS } from "../../common/StereochemistryButtonOptions.js";
-import StereochemistryColors from "../../StereochemistryColors.js";
-import { SCREEN_VIEW_MARGIN } from "../../StereochemistryConstants.js";
+import { StereochemistryPanel } from "../../common/StereochemistryPanel.js";
+import { MoleculeChooserNode } from "../../common/view/MoleculeChooserNode.js";
+import { stereoButton, stereoCheckbox, stereoText } from "../../common/view/StereoControls.js";
+import { StereoViewerNode } from "../../common/view/StereoViewerNode.js";
+import { StringManager } from "../../i18n/StringManager.js";
+import Colors from "../../StereochemistryColors.js";
+import {
+  STEREO_LAYOUT_SETTINGS as LAYOUT,
+  SCREEN_VIEW_MARGIN,
+  CHIRALITY_SCREEN_SETTINGS as SETTINGS,
+} from "../../StereochemistryConstants.js";
 import type { ChiralityModel } from "../model/ChiralityModel.js";
-import { ChiralityScreenSummaryContent } from "./ChiralityScreenSummaryContent.js";
-
-export type ChiralityScreenViewOptions = ScreenViewOptions;
+import { ChiralityScreenSummaryContent, chiralityReadouts } from "./ChiralityScreenSummaryContent.js";
 
 export class ChiralityScreenView extends ScreenView {
-  public constructor(model: ChiralityModel, providedOptions?: ChiralityScreenViewOptions) {
-    // ── Accessibility: screen summary ───────────────────────────────────────────
-    // The screen summary is the first thing a screen-reader user encounters. It
-    // is registered here, in the ScreenView's super() options, so every sim wires
-    // it the same way. See ChiralityScreenSummaryContent for the four content regions.
-    const options = optionize<ChiralityScreenViewOptions, EmptySelfOptions, ScreenViewOptions>()(
-      {
-        screenSummaryContent: new ChiralityScreenSummaryContent(model),
-      },
-      providedOptions,
-    );
-    super(options);
+  public constructor(model: ChiralityModel, options?: ScreenViewOptions) {
+    const readouts = chiralityReadouts(model);
+    super({ ...options, screenSummaryContent: new ChiralityScreenSummaryContent(readouts) });
 
-    // ── Background ────────────────────────────────────────────────────────────
-    // A full-screen rectangle that follows the active color profile.
-    // Replace or remove once you add real content.
-    const backgroundRect = new Rectangle(0, 0, this.layoutBounds.width, this.layoutBounds.height, {
-      fill: StereochemistryColors.backgroundColorProperty,
+    const manager = StringManager.getInstance();
+    const strings = manager.getChiralityStrings();
+    const shared = manager.getStereoStrings();
+    const a11y = manager.getChiralityA11yStrings();
+    const bounds = new Bounds2(0, 0, SETTINGS.VIEWPORT_WIDTH, SETTINGS.VIEWPORT_HEIGHT);
+    const original = new StereoViewerNode(model.originalView, bounds, {
+      accessibleName: a11y.viewerStringProperty,
+      canPick: (index) => model.descriptorProperty.value.has(index),
+      center: () => [0, 0, 0],
     });
-    this.addChild(backgroundRect);
+    const mirror = new StereoViewerNode(model.mirrorView, bounds, {
+      interactive: false,
+      center: () => [0, 0, 0],
+      fitMolecule: () => model.builtProperty.value,
+    });
+    const originalTitle = stereoText(strings.originalStringProperty, LAYOUT.HEADING_FONT_SIZE);
+    const mirrorTitle = stereoText(strings.mirrorStringProperty, LAYOUT.HEADING_FONT_SIZE);
+    const spacing = LAYOUT.GAP;
+    const totalWidth = bounds.width * 2 + spacing * 2;
+    const midpoint = totalWidth / 2;
+    const mirrorPlane = new Line(midpoint, 0, midpoint, bounds.height, {
+      stroke: Colors.mirrorPlaneColorProperty,
+      lineWidth: SETTINGS.MIRROR_PLANE_WIDTH,
+      lineDash: [...SETTINGS.MIRROR_PLANE_DASH],
+      pickable: false,
+    });
+    const viewers = new Node({
+      children: [
+        new Rectangle(0, 0, totalWidth, bounds.height),
+        mirrorPlane,
+        original,
+        mirror,
+        originalTitle,
+        mirrorTitle,
+      ],
+      x: this.layoutBounds.centerX - midpoint,
+      y: this.layoutBounds.minY + SETTINGS.VIEWERS_TOP,
+    });
+    originalTitle.localBoundsProperty.link(() => {
+      originalTitle.centerX = bounds.centerX;
+    });
+    mirrorTitle.localBoundsProperty.link(() => {
+      mirrorTitle.centerX = totalWidth - bounds.centerX;
+    });
 
-    // ── Accessibility: per-control names ────────────────────────────────────────
-    // EVERY interactive node must carry an `accessibleName` (and an
-    // `accessibleHelpText` where useful), sourced from the StringManager `a11y`
-    // string group — never a hard-coded English literal. Sun/scenery-phet controls
-    // (NumberControl, Checkbox, ComboBox, AquaRadioButtonGroup, …) accept it as an
-    // option; a draggable plain Node needs `tagName: "div", focusable: true` too.
-    // Example (uncomment and adapt when you add a real control; add the
-    // `a11y.controls.startButton` string to every strings_*.json first):
-    //
-    //   const a11y = StringManager.getInstance().getA11yStrings();
-    //   const startButton = new RectangularPushButton({
-    //     ...FLAT_RECTANGULAR_BUTTON_OPTIONS, // flat appearance, not SceneryStack's default 3-D look
-    //     content: someIcon,
-    //     listener: () => model.start(),
-    //     accessibleName: a11y.controls.startButtonStringProperty,
-    //   });
-    //   this.addChild(startButton);
+    Multilink.multilink([model.showMirrorProperty, model.superimposeProgressProperty], (show, progress) => {
+      const slide = (midpoint - bounds.centerX) * progress;
+      original.x = show ? slide : midpoint - bounds.centerX;
+      mirror.x = totalWidth - bounds.width - slide;
+      mirror.visible = show;
+      mirrorPlane.visible = show && progress === 0;
+      mirrorTitle.visible = show && progress === 0;
+      originalTitle.visible = show && progress === 0;
+    });
+    Multilink.multilink(
+      [model.descriptorProperty, model.showStereocentresProperty, strings.centreMarkStringProperty],
+      (labels, show, mark) => {
+        const marks = new Map(show ? [...labels.keys()].map((index) => [index, mark]) : []);
+        model.originalView.labelsProperty.value = marks;
+        model.mirrorView.labelsProperty.value = marks;
+      },
+    );
 
-    // ── Reset All button ──────────────────────────────────────────────────────
-    // Always position at bottom-right (PhET convention).
-    const resetAllButton = new ResetAllButton({
+    const results = new VBox({
+      spacing: LAYOUT.ROW_GAP,
+      children: [
+        new HBox({
+          spacing,
+          children: [
+            stereoText(readouts.countProperty),
+            stereoText(readouts.chiralityProperty, LAYOUT.HEADING_FONT_SIZE),
+            stereoText(readouts.descriptorProperty),
+          ],
+        }),
+        stereoText(readouts.resultProperty, LAYOUT.HEADING_FONT_SIZE, Colors.accentColorProperty, totalWidth),
+      ],
+    });
+    results.boundsProperty.link(() => {
+      results.centerX = this.layoutBounds.centerX;
+    });
+    results.top = this.layoutBounds.minY + SETTINGS.VIEWERS_TOP + bounds.height;
+    model.completedProperty.lazyLink((complete) => {
+      if (complete) {
+        this.addAccessibleResponse(
+          model.isChiralProperty.value ? strings.mismatchStringProperty : strings.matchStringProperty,
+        );
+      }
+    });
+
+    const listParent = new Node();
+    const chooser = new MoleculeChooserNode(
+      model.moleculeProperty,
+      "chirality",
+      listParent,
+      shared.moleculeStringProperty,
+    );
+    const superimpose = stereoButton(strings.superimposeStringProperty, () => model.superimpose());
+    const separate = stereoButton(strings.separateStringProperty, () => model.separate());
+    const resetView = stereoButton(manager.getStereoA11yStrings().resetViewStringProperty, () =>
+      model.originalView.resetView(),
+    );
+    const swap = stereoButton(strings.swapStringProperty, () => {
+      const picked = model.originalView.pickedAtomProperty.value;
+      const centre = picked ?? model.descriptorProperty.value.keys().next().value;
+      if (centre !== undefined) {
+        model.swapGroups(centre);
+        this.addAccessibleResponse(readouts.chiralityProperty);
+      }
+    });
+    model.superimposeProgressProperty.link((progress) => {
+      separate.enabled = progress > 0;
+    });
+    model.stereocentreCountProperty.link((count) => {
+      swap.enabled = count > 0;
+    });
+    const showMirror = stereoCheckbox(model.showMirrorProperty, strings.showMirrorStringProperty);
+    const showCentres = stereoCheckbox(model.showStereocentresProperty, strings.showStereocentresStringProperty);
+    const controls = new StereochemistryPanel(
+      new VBox({
+        spacing,
+        children: [
+          new HBox({ spacing, children: [chooser, showMirror, showCentres] }),
+          new HBox({ spacing, children: [superimpose, separate, swap, resetView] }),
+        ],
+      }),
+    );
+    controls.boundsProperty.link(() => {
+      controls.centerX = this.layoutBounds.centerX;
+    });
+    controls.top = results.top + SETTINGS.CONTROLS_OFFSET;
+
+    const resetAll = new ResetAllButton({
       ...FLAT_RESET_ALL_BUTTON_OPTIONS,
       listener: () => {
+        this.interruptSubtreeInput();
         model.reset();
-        this.reset();
       },
       right: this.layoutBounds.maxX - SCREEN_VIEW_MARGIN,
       bottom: this.layoutBounds.maxY - SCREEN_VIEW_MARGIN,
     });
-    this.addChild(resetAllButton);
-
-    // ── Accessibility: keyboard / reading traversal order ───────────────────────
-    // Make the parallel DOM (Tab order and screen-reader reading order)
-    // deterministic and independent of child z-order. ScreenView throws if you
-    // set pdomOrder on itself, so add a lightweight wrapper Node that "borrows"
-    // the interactive nodes in the order a user should reach them — Reset All
-    // last. Non-interactive decoration (background, placeholder) is omitted.
-    this.addChild(
+    this.children = [
+      viewers,
+      results,
+      controls,
+      resetAll,
+      listParent,
       new Node({
-        pdomOrder: [
-          // TODO: add the sim's interactive nodes here, in traversal order
-          resetAllButton,
-        ],
+        pdomOrder: [original, chooser, showMirror, showCentres, superimpose, separate, swap, resetView, resetAll],
       }),
-    );
+    ];
   }
-
-  /**
-   * Resets view-side state (animations, panel visibility, etc.).
-   * Called by the Reset All button listener.
-   */
-  public reset(): void {
-    // TODO: reset any view-side state here
-  }
-
-  /**
-   * Steps the view forward by dt seconds for animation.
-   * @param _dt - elapsed time in seconds
-   */
-  public override step(_dt: number): void {
-    // TODO: implement animation updates here
-  }
-
-  // ── Accessibility / listeners: dispose ─────────────────────────────────────
-  // ScreenView is `isDisposable: false` and lives for the whole sim, so this
-  // class rarely needs dispose(). Child Nodes (and a live currentDetails
-  // DerivedProperty you own on a short-lived object) do. When you add
-  // DerivedProperty / Multilink / Property.link against model state, keep the
-  // references and tear them down — forks copy what they see. Pattern:
-  //
-  // private readonly disposeChiralityScreenView: () => void;
-  //
-  // // in the constructor, after creating the listeners:
-  // const statusMultilink = Multilink.multilink(
-  //   [model.someProperty, model.otherProperty],
-  //   (a, b) => { /* update view from model */ },
-  // );
-  // const detailsProperty = new DerivedProperty(
-  //   [model.stateProperty],
-  //   (state) => `State: ${state}`,
-  // ); // → pass as currentDetailsContent in ChiralityScreenSummaryContent
-  // const onExternal = (v: number) => { /* … */ };
-  // model.externalProperty.link(onExternal); // Property you do NOT own
-  //
-  // this.disposeChiralityScreenView = () => {
-  //   statusMultilink.dispose();                 // Multilink you created
-  //   detailsProperty.dispose();                 // DerivedProperty you created
-  //   model.externalProperty.unlink(onExternal); // undo external link
-  // };
-  //
-  // public override dispose(): void {
-  //   this.disposeChiralityScreenView();
-  //   super.dispose();
-  // }
 }

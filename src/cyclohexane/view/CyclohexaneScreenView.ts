@@ -1,7 +1,7 @@
-import { DerivedProperty, Multilink, PatternStringProperty, Property } from "scenerystack/axon";
+import { DerivedProperty, Multilink, PatternStringProperty, Property, type TReadOnlyProperty } from "scenerystack/axon";
 import { Bounds2, Range, toFixed } from "scenerystack/dot";
 import { type EmptySelfOptions, optionize } from "scenerystack/phet-core";
-import { HBox, Node, VBox } from "scenerystack/scenery";
+import { HBox, Line, Node, type TPaint, VBox } from "scenerystack/scenery";
 import { ResetAllButton } from "scenerystack/scenery-phet";
 import { ScreenView, type ScreenViewOptions } from "scenerystack/sim";
 import { AquaRadioButtonGroup, ComboBox, HSlider } from "scenerystack/sun";
@@ -68,7 +68,7 @@ export class CyclohexaneScreenView extends ScreenView {
     };
     const viewer = new StereoViewerNode(
       model.stereoViewModel,
-      new Bounds2(0, 0, LAYOUT.CHAIR_VIEWPORT_WIDTH, LAYOUT.VIEWPORT_HEIGHT),
+      new Bounds2(0, 0, LAYOUT.CHAIR_VIEWPORT_WIDTH, SETTINGS.VIEWPORT_HEIGHT),
       {
         helpText: a11y.viewerHelpStringProperty,
         canPick: (index) => index < RING.RING_SIZE,
@@ -78,11 +78,19 @@ export class CyclohexaneScreenView extends ScreenView {
       },
     );
     const resetView = stereoButton(sharedA11y.resetViewStringProperty, () => model.stereoViewModel.resetView());
+    const legendItem = (label: TReadOnlyProperty<string>, stroke: TPaint) =>
+      new HBox({
+        spacing: LAYOUT.ROW_GAP,
+        children: [
+          new Line(0, 0, SETTINGS.LEGEND_SWATCH_WIDTH, 0, { stroke, lineWidth: SETTINGS.LEGEND_SWATCH_LINE_WIDTH }),
+          stereoText(label, LAYOUT.SMALL_FONT_SIZE),
+        ],
+      });
     const bondLegend = new HBox({
       spacing: LAYOUT.GAP,
       children: [
-        stereoText(strings.axialStringProperty, LAYOUT.FONT_SIZE, Colors.axialColorProperty),
-        stereoText(strings.equatorialStringProperty, LAYOUT.FONT_SIZE, Colors.equatorialColorProperty),
+        legendItem(strings.axialStringProperty, Colors.axialColorProperty),
+        legendItem(strings.equatorialStringProperty, Colors.equatorialColorProperty),
       ],
     });
     model.showBondTypesProperty.link((visible) => {
@@ -90,11 +98,7 @@ export class CyclohexaneScreenView extends ScreenView {
     });
     const viewerColumn = new VBox({
       spacing: LAYOUT.ROW_GAP,
-      children: [
-        stereoText(strings.molecule3DStringProperty, LAYOUT.HEADING_FONT_SIZE),
-        viewer,
-        new HBox({ children: [resetView, bondLegend], spacing: LAYOUT.GAP }),
-      ],
+      children: [stereoText(strings.molecule3DStringProperty, LAYOUT.HEADING_FONT_SIZE), viewer, bondLegend, resetView],
     });
 
     const landmarkNames = [
